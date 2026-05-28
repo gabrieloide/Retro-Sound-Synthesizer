@@ -24,6 +24,7 @@ namespace RetroSoundSynthesizer.Editor
         // Editor layout variables
         private int controlMode = 0; // 0 = Sliders Manuales, 1 = Preset Pad / 2D Mixer
         private Vector2 scrollPosLeft;
+        private Vector2 scrollPosRight;
         private Vector2 padCoordinates = new Vector2(0.5f, 0.5f);
         private string jsonClipboardText = "";
         private float jsonTextAreaHeight = 120f;
@@ -326,6 +327,7 @@ namespace RetroSoundSynthesizer.Editor
 
         private void DrawRightColumn()
         {
+            scrollPosRight = EditorGUILayout.BeginScrollView(scrollPosRight);
             GUILayout.Space(10);
             GUILayout.Label("💾 FORMATO Y EXPORTACIÓN", headerStyle);
 
@@ -478,6 +480,7 @@ namespace RetroSoundSynthesizer.Editor
             }
 
             EditorGUILayout.EndVertical();
+            EditorGUILayout.EndScrollView();
         }
 
         private void PlayCurrentAudio()

@@ -17,13 +17,13 @@ namespace RetroSoundSynthesizer.Editor
             window.Show();
         }
 
-        private SoundParameters currentParams = new SoundParameters();
+        private CompositeSound currentSound = new CompositeSound();
         private SoundPack currentPack = new SoundPack();
         private bool isSoundPackLoaded = false;
         private AudioClip previewClip;
 
         // Advanced features state
-        private List<SoundParameters> auditionHistory = new List<SoundParameters>();
+        private List<CompositeSound> auditionHistory = new List<CompositeSound>();
         private int activeLayerIndex = -1; // -1 = Capa Base (Principal), 0+ = Capas adicionales
 
         // Editor layout variables
@@ -129,13 +129,13 @@ namespace RetroSoundSynthesizer.Editor
 
         private SoundParameters GetActiveEditingParams()
         {
-            if (currentParams == null) return null;
-            if (currentParams.layers == null) currentParams.layers = new List<SoundParameters>();
-            if (activeLayerIndex == -1 || activeLayerIndex >= currentParams.layers.Count)
+            if (currentSound == null) return null;
+            if (currentSound.layers == null) currentSound.layers = new List<SoundParameters>();
+            if (activeLayerIndex == -1 || activeLayerIndex >= currentSound.layers.Count)
             {
-                return currentParams;
+                return currentSound.baseSound;
             }
-            return currentParams.layers[activeLayerIndex];
+            return currentSound.layers[activeLayerIndex];
         }
 
         private void DrawLeftColumn()
@@ -149,12 +149,13 @@ namespace RetroSoundSynthesizer.Editor
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("🔀 Mezclador de Capas (Sound Layers)", EditorStyles.boldLabel);
             
-            int totalLayers = currentParams.layers != null ? currentParams.layers.Count : 0;
+            if (currentSound.layers == null) currentSound.layers = new List<SoundParameters>();
+            int totalLayers = currentSound.layers.Count;
             string[] layerTabs = new string[1 + totalLayers];
             layerTabs[0] = "Capa Base";
             for (int i = 0; i < totalLayers; i++)
             {
-                layerTabs[i + 1] = $"Capa #{i + 1} ({currentParams.layers[i].waveType})";
+                layerTabs[i + 1] = $"Capa #{i + 1} ({currentSound.layers[i].waveType})";
             }
 
             int selectedTab = activeLayerIndex + 1;
@@ -166,26 +167,23 @@ namespace RetroSoundSynthesizer.Editor
             
             if (GUILayout.Button("➕ Añadir Capa", GUILayout.Height(22)))
             {
-                if (currentParams.layers == null) currentParams.layers = new List<SoundParameters>();
-                
                 // Clone base sound parameters to provide a beautiful starting point
-                SoundParameters newLayer = currentParams.Clone();
-                newLayer.layers.Clear();
-                newLayer.soundName = $"Capa_{currentParams.layers.Count + 1}";
-                newLayer.delay = 0.15f * (currentParams.layers.Count + 1);
+                SoundParameters newLayer = currentSound.baseSound.Clone();
+                newLayer.soundName = $"Capa_{currentSound.layers.Count + 1}";
+                newLayer.delay = 0.15f * (currentSound.layers.Count + 1);
                 newLayer.masterGain = 0.35f; // slightly quieter as a layer
 
-                currentParams.layers.Add(newLayer);
-                activeLayerIndex = currentParams.layers.Count - 1; // select the newly added layer
+                currentSound.layers.Add(newLayer);
+                activeLayerIndex = currentSound.layers.Count - 1; // select the newly added layer
                 UpdateJsonTextArea();
             }
 
-            if (activeLayerIndex >= 0 && currentParams.layers != null && activeLayerIndex < currentParams.layers.Count)
+            if (activeLayerIndex >= 0 && currentSound.layers != null && activeLayerIndex < currentSound.layers.Count)
             {
                 GUI.backgroundColor = new Color(0.9f, 0.3f, 0.3f);
                 if (GUILayout.Button("🗑️ Eliminar Capa", GUILayout.Height(22)))
                 {
-                    currentParams.layers.RemoveAt(activeLayerIndex);
+                    currentSound.layers.RemoveAt(activeLayerIndex);
                     activeLayerIndex = activeLayerIndex - 1; // fallback to base or previous layer
                     UpdateJsonTextArea();
                 }
@@ -195,10 +193,10 @@ namespace RetroSoundSynthesizer.Editor
             GUILayout.EndHorizontal();
 
             // Layer-specific settings slider (Delay and Layer Master Gain)
-            if (activeLayerIndex >= 0 && currentParams.layers != null && activeLayerIndex < currentParams.layers.Count)
+            if (activeLayerIndex >= 0 && currentSound.layers != null && activeLayerIndex < currentSound.layers.Count)
             {
                 GUILayout.Space(6);
-                var activeLayer = currentParams.layers[activeLayerIndex];
+                var activeLayer = currentSound.layers[activeLayerIndex];
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 GUILayout.Label($"Ajustes Específicos de Capa #{activeLayerIndex + 1}", EditorStyles.miniBoldLabel);
                 activeLayer.delay = EditorGUILayout.Slider("Retardo (Delay en Seg)", activeLayer.delay, 0f, 4f);
@@ -435,19 +433,19 @@ namespace RetroSoundSynthesizer.Editor
             PlayCurrentAudio();
         }
 
-        private void AddToAuditionHistory(SoundParameters p)
+        private void AddToAuditionHistory(CompositeSound cs)
         {
-            if (p == null) return;
+            if (cs == null) return;
 
             // Check if identical to the last item in the history to avoid duplicate listings
             if (auditionHistory.Count > 0)
             {
-                string newJson = JsonUtility.ToJson(p);
+                string newJson = JsonUtility.ToJson(cs);
                 string lastJson = JsonUtility.ToJson(auditionHistory[auditionHistory.Count - 1]);
                 if (newJson == lastJson) return; // ignore duplicates
             }
 
-            auditionHistory.Add(p.Clone());
+            auditionHistory.Add(cs.Clone());
 
             // Limit history to 12 items max
             if (auditionHistory.Count > 12)
@@ -466,7 +464,7 @@ namespace RetroSoundSynthesizer.Editor
             // Sound Name Field
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("🏷️ Sound Name", EditorStyles.boldLabel);
-            currentParams.soundName = EditorGUILayout.TextField("", currentParams.soundName);
+            currentSound.baseSound.soundName = EditorGUILayout.TextField("", currentSound.baseSound.soundName);
             EditorGUILayout.EndVertical();
 
             // Big Preview Play Button
@@ -509,12 +507,12 @@ namespace RetroSoundSynthesizer.Editor
                 for (int h = auditionHistory.Count - 1; h >= 0; h--)
                 {
                     var histItem = auditionHistory[h];
-                    string label = $"{auditionHistory.Count - h}. {histItem.soundName} ({histItem.waveType})";
+                    string label = $"{auditionHistory.Count - h}. {histItem.baseSound.soundName} ({histItem.baseSound.waveType})";
                     if (histItem.layers != null && histItem.layers.Count > 0)
                     {
                         label += $" [{histItem.layers.Count + 1} capas]";
                     }
-                    if (histItem.lfoTarget != LfoTarget.None)
+                    if (histItem.baseSound.lfoTarget != LfoTarget.None)
                     {
                         label += " +LFO";
                     }
@@ -522,13 +520,13 @@ namespace RetroSoundSynthesizer.Editor
                     GUILayout.BeginHorizontal();
                     if (GUILayout.Button(label, EditorStyles.miniButtonLeft, GUILayout.Height(20)))
                     {
-                        currentParams = histItem.Clone();
+                        currentSound = histItem.Clone();
                         activeLayerIndex = -1; // Reset selection to base
                         UpdateJsonTextArea();
 
                         // Play immediately
-                        float[] buffer = SynthEngine.Synthesize(currentParams);
-                        PlayPreview(buffer, currentParams.sampleRate);
+                        float[] buffer = SynthEngine.Synthesize(currentSound);
+                        PlayPreview(buffer, currentSound.baseSound.sampleRate);
                     }
                     if (GUILayout.Button("🗑️", GUILayout.Width(25), GUILayout.Height(20)))
                     {
@@ -548,16 +546,16 @@ namespace RetroSoundSynthesizer.Editor
             // Export format options
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("⚙️ Output WAV Settings", EditorStyles.boldLabel);
-            currentParams.sampleRate = (SampleRateOption)EditorGUILayout.EnumPopup("Sample Rate", currentParams.sampleRate);
-            currentParams.sampleSize = (SampleSizeOption)EditorGUILayout.EnumPopup("Sample Resolution", currentParams.sampleSize);
-            currentParams.masterGain = EditorGUILayout.Slider("Master Gain", currentParams.masterGain, 0f, 1f);
+            currentSound.baseSound.sampleRate = (SampleRateOption)EditorGUILayout.EnumPopup("Sample Rate", currentSound.baseSound.sampleRate);
+            currentSound.baseSound.sampleSize = (SampleSizeOption)EditorGUILayout.EnumPopup("Sample Resolution", currentSound.baseSound.sampleSize);
+            currentSound.baseSound.masterGain = EditorGUILayout.Slider("Master Gain", currentSound.baseSound.masterGain, 0f, 1f);
 
             GUILayout.Space(10);
 
             if (GUILayout.Button("💾 EXPORT .WAV FILE", GUILayout.Height(35)))
             {
-                float[] buffer = SynthEngine.Synthesize(currentParams);
-                string savedPath = WavExporter.ExportToWav(buffer, currentParams.sampleRate, currentParams.sampleSize, currentParams.soundName);
+                float[] buffer = SynthEngine.Synthesize(currentSound);
+                string savedPath = WavExporter.ExportToWav(buffer, currentSound.baseSound.sampleRate, currentSound.baseSound.sampleSize, currentSound.baseSound.soundName);
                 if (!string.IsNullOrEmpty(savedPath))
                 {
                     EditorUtility.DisplayDialog("Procedural Synth", $"Saved procedural .wav sound successfully at:\n{savedPath}", "OK");
@@ -616,7 +614,7 @@ namespace RetroSoundSynthesizer.Editor
                 }
                 else
                 {
-                    jsonClipboardText = JsonUtility.ToJson(currentParams, true);
+                    jsonClipboardText = JsonUtility.ToJson(currentSound, true);
                 }
                 GUIUtility.systemCopyBuffer = jsonClipboardText;
                 Debug.Log("[ProceduralAudioEditor] Copied sound JSON configuration to clipboard.");
@@ -641,7 +639,7 @@ namespace RetroSoundSynthesizer.Editor
                     {
                         var sound = currentPack.sounds[i];
                         float[] buffer = SynthEngine.Synthesize(sound);
-                        string savedPath = WavExporter.ExportToWav(buffer, sound.sampleRate, sound.sampleSize, sound.soundName);
+                        string savedPath = WavExporter.ExportToWav(buffer, sound.baseSound.sampleRate, sound.baseSound.sampleSize, sound.baseSound.soundName);
                         if (!string.IsNullOrEmpty(savedPath))
                         {
                             successCount++;
@@ -662,9 +660,9 @@ namespace RetroSoundSynthesizer.Editor
 
         private void PlayCurrentAudio()
         {
-            AddToAuditionHistory(currentParams);
-            float[] buffer = SynthEngine.Synthesize(currentParams);
-            PlayPreview(buffer, currentParams.sampleRate);
+            AddToAuditionHistory(currentSound);
+            float[] buffer = SynthEngine.Synthesize(currentSound);
+            PlayPreview(buffer, currentSound.baseSound.sampleRate);
         }
 
         private void PlayPreview(float[] samples, SampleRateOption rateOption)
@@ -784,7 +782,7 @@ namespace RetroSoundSynthesizer.Editor
                     currentPack = pack;
                     isSoundPackLoaded = true;
                     // Load first element into sliders
-                    currentParams = currentPack.sounds[0].Clone();
+                    currentSound = currentPack.sounds[0].Clone();
                     jsonClipboardText = json;
                     activeLayerIndex = -1; // Reset active layer selection
                     Debug.Log($"[ProceduralAudioEditor] Decoded SoundPack with {currentPack.sounds.Count} sounds.");
@@ -797,18 +795,39 @@ namespace RetroSoundSynthesizer.Editor
                 // Silence exception to fallback to single sound
             }
 
-            // Fallback to single sound deserialization
+            // Attempt layered composite sound deserialization
+            try
+            {
+                CompositeSound layered = JsonUtility.FromJson<CompositeSound>(json);
+                if (layered != null && layered.baseSound != null && !string.IsNullOrEmpty(layered.baseSound.soundName))
+                {
+                    currentSound = layered;
+                    isSoundPackLoaded = false;
+                    currentPack = new SoundPack();
+                    jsonClipboardText = json;
+                    activeLayerIndex = -1; // Reset active layer selection
+                    Debug.Log("[ProceduralAudioEditor] Decoded layered composite sound settings.");
+                    Repaint();
+                    return;
+                }
+            }
+            catch
+            {
+                // Silence exception to fallback to legacy single sound
+            }
+
+            // Fallback to legacy single sound deserialization (Backwards Compatibility)
             try
             {
                 SoundParameters single = JsonUtility.FromJson<SoundParameters>(json);
                 if (single != null && !string.IsNullOrEmpty(single.soundName))
                 {
-                    currentParams = single;
+                    currentSound = new CompositeSound { baseSound = single, layers = new List<SoundParameters>() };
                     isSoundPackLoaded = false;
                     currentPack = new SoundPack();
                     jsonClipboardText = json;
                     activeLayerIndex = -1; // Reset active layer selection
-                    Debug.Log("[ProceduralAudioEditor] Decoded single sound settings.");
+                    Debug.Log("[ProceduralAudioEditor] Decoded single sound settings into base layer.");
                     Repaint();
                 }
             }
@@ -826,7 +845,7 @@ namespace RetroSoundSynthesizer.Editor
             }
             else
             {
-                jsonClipboardText = JsonUtility.ToJson(currentParams, true);
+                jsonClipboardText = JsonUtility.ToJson(currentSound, true);
             }
         }
 

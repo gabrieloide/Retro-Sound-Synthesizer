@@ -8,30 +8,26 @@ namespace RetroSoundSynthesizer.Runtime
         private const int LO_RES_NOISE_PERIOD = 8;
 
         /// <summary>
-        /// Mathematically synthesizes sound parameters into a raw float audio buffer.
-        /// Integrates recursive multi-layer mixing and advanced LFO modulation.
+        /// Synthesizes a layered CompositeSound by combining a base SoundParameters and multiple sub-layers.
         /// </summary>
-        public static float[] Synthesize(SoundParameters p)
+        public static float[] Synthesize(CompositeSound cs)
         {
-            // --- LAYER MIXING & SUMMING ---
-            if (p.layers != null && p.layers.Count > 0)
+            if (cs == null) return new float[0];
+
+            if (cs.layers != null && cs.layers.Count > 0)
             {
-                // Force base parameters clone to avoid recursive infinity
-                SoundParameters baseParams = p.Clone();
-                baseParams.layers.Clear(); // Keep it single-layered
-                float[] baseBuffer = Synthesize(baseParams);
-
+                float[] baseBuffer = Synthesize(cs.baseSound);
                 int maxSamples = baseBuffer.Length;
-                float[][] layerBuffers = new float[p.layers.Count][];
+                float[][] layerBuffers = new float[cs.layers.Count][];
 
-                for (int i = 0; i < p.layers.Count; i++)
+                for (int i = 0; i < cs.layers.Count; i++)
                 {
-                    var layer = p.layers[i];
+                    var layer = cs.layers[i];
                     // Force the layer to synthesize at the same sample rate for consistency
-                    layer.sampleRate = p.sampleRate;
+                    layer.sampleRate = cs.baseSound.sampleRate;
                     layerBuffers[i] = Synthesize(layer);
 
-                    int delaySamples = (int)(layer.delay * (float)p.sampleRate);
+                    int delaySamples = (int)(layer.delay * (float)cs.baseSound.sampleRate);
                     int totalLength = layerBuffers[i].Length + delaySamples;
                     if (totalLength > maxSamples)
                     {
@@ -48,11 +44,11 @@ namespace RetroSoundSynthesizer.Runtime
                 }
 
                 // Add each layer buffer with its delay offset
-                for (int i = 0; i < p.layers.Count; i++)
+                for (int i = 0; i < cs.layers.Count; i++)
                 {
-                    var layer = p.layers[i];
+                    var layer = cs.layers[i];
                     float[] lBuf = layerBuffers[i];
-                    int delaySamples = (int)(layer.delay * (float)p.sampleRate);
+                    int delaySamples = (int)(layer.delay * (float)cs.baseSound.sampleRate);
 
                     for (int s = 0; s < lBuf.Length; s++)
                     {
@@ -74,6 +70,16 @@ namespace RetroSoundSynthesizer.Runtime
                 return mixedBuffer;
             }
 
+            // Fallback to simple single-layer synthesis
+            return Synthesize(cs.baseSound);
+        }
+
+        /// <summary>
+        /// Mathematically synthesizes sound parameters into a raw float audio buffer.
+        /// The buffer is generated at the selected SampleRate mono and normalized between -1.0 and 1.0.
+        /// </summary>
+        public static float[] Synthesize(SoundParameters p)
+        {
             // Seeded RNG for noise generation so synthesis remains deterministic if parameters don't change
             System.Random rand = new System.Random(1337);
 
@@ -569,13 +575,12 @@ namespace RetroSoundSynthesizer.Runtime
             p.hpCutoffFrequency = 0.0f;
             p.hpCutoffSweep = 0.0f;
 
-            // Reset LFO and Layers
+            // Reset LFO
             p.lfoTarget = LfoTarget.None;
             p.lfoWaveform = LfoWaveform.Sine;
             p.lfoSpeed = 0.0f;
             p.lfoDepth = 0.0f;
             p.delay = 0.0f;
-            p.layers.Clear();
 
             switch (presetName.ToLower())
             {

@@ -96,9 +96,8 @@ namespace RetroSoundSynthesizer.Runtime
         [Range(0f, 1f)] public float lfoSpeed = 0.0f;
         [Range(0f, 1f)] public float lfoDepth = 0.0f;
 
-        // Mixing & Layering
-        [Range(0f, 5f)] public float delay = 0.0f;             // Delay in seconds before this layer plays
-        public List<SoundParameters> layers = new List<SoundParameters>();
+        // Layer delay (used when this SoundParameters is mixed as a layer)
+        [Range(0f, 5f)] public float delay = 0.0f;
 
         // Output configuration
         public SampleRateOption sampleRate = SampleRateOption.Rate44k;
@@ -107,7 +106,7 @@ namespace RetroSoundSynthesizer.Runtime
 
         public SoundParameters Clone()
         {
-            var clone = new SoundParameters
+            return new SoundParameters
             {
                 soundName = this.soundName,
                 waveType = this.waveType,
@@ -140,19 +139,8 @@ namespace RetroSoundSynthesizer.Runtime
                 delay = this.delay,
                 sampleRate = this.sampleRate,
                 sampleSize = this.sampleSize,
-                masterGain = this.masterGain,
-                layers = new List<SoundParameters>()
+                masterGain = this.masterGain
             };
-
-            if (this.layers != null)
-            {
-                foreach (var layer in this.layers)
-                {
-                    clone.layers.Add(layer.Clone());
-                }
-            }
-
-            return clone;
         }
 
         public void Randomize()
@@ -210,8 +198,6 @@ namespace RetroSoundSynthesizer.Runtime
                 lfoDepth = 0.0f;
             }
 
-            // Clear layers on simple randomize to keep things fast
-            layers.Clear();
             delay = 0.0f;
 
             if (attackTime + sustainTime + decayTime < 0.2f)
@@ -233,8 +219,34 @@ namespace RetroSoundSynthesizer.Runtime
     }
 
     [Serializable]
+    public class CompositeSound
+    {
+        public SoundParameters baseSound = new SoundParameters();
+        public List<SoundParameters> layers = new List<SoundParameters>();
+
+        public CompositeSound Clone()
+        {
+            var clone = new CompositeSound
+            {
+                baseSound = this.baseSound.Clone(),
+                layers = new List<SoundParameters>()
+            };
+
+            if (this.layers != null)
+            {
+                foreach (var layer in this.layers)
+                {
+                    clone.layers.Add(layer.Clone());
+                }
+            }
+
+            return clone;
+        }
+    }
+
+    [Serializable]
     public class SoundPack
     {
-        public List<SoundParameters> sounds = new List<SoundParameters>();
+        public List<CompositeSound> sounds = new List<CompositeSound>();
     }
 }

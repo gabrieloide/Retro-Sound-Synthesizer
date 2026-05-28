@@ -103,7 +103,9 @@ namespace RetroSoundSynthesizer.Editor
             // COLUMNA DERECHA (Panel Fijo)
             // =========================================================================
             EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.33f));
+            scrollPosRight = EditorGUILayout.BeginScrollView(scrollPosRight);
             DrawRightColumn();
+            EditorGUILayout.EndScrollView();
             EditorGUILayout.EndVertical();
 
             EditorGUILayout.EndHorizontal();
@@ -327,7 +329,6 @@ namespace RetroSoundSynthesizer.Editor
 
         private void DrawRightColumn()
         {
-            scrollPosRight = EditorGUILayout.BeginScrollView(scrollPosRight);
             GUILayout.Space(10);
             GUILayout.Label("💾 FORMATO Y EXPORTACIÓN", headerStyle);
 
@@ -480,7 +481,6 @@ namespace RetroSoundSynthesizer.Editor
             }
 
             EditorGUILayout.EndVertical();
-            EditorGUILayout.EndScrollView();
         }
 
         private void PlayCurrentAudio()

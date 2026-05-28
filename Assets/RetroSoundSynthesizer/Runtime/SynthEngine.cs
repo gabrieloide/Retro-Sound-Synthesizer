@@ -67,6 +67,7 @@ namespace RetroSoundSynthesizer.Runtime
             }
 
             // Low-Pass Filter
+            bool filtersActive = p.lpCutoffFrequency != 1.0f || p.hpCutoffFrequency != 0.0f;
             float lpFilterCutoff = p.lpCutoffFrequency * p.lpCutoffFrequency * p.lpCutoffFrequency * 0.1f;
             float lpFilterDeltaCutoff = 1.0f + p.lpCutoffSweep * 0.0001f;
             float lpFilterDamping = 5.0f / (1.0f + p.resonance * p.resonance * 20.0f) * (0.01f + lpFilterCutoff);
@@ -273,26 +274,29 @@ namespace RetroSoundSynthesizer.Runtime
                         }
 
                         // Apply Filters
-                        float lpFilterOldPos = lpFilterPos;
-                        lpFilterCutoff *= lpFilterDeltaCutoff;
-                        if (lpFilterCutoff < 0.0f) lpFilterCutoff = 0.0f;
-                        else if (lpFilterCutoff > 0.1f) lpFilterCutoff = 0.1f;
-
-                        if (lpFilterOn)
+                        if (filtersActive)
                         {
-                            lpFilterDeltaPos += (sample - lpFilterPos) * lpFilterCutoff;
-                            lpFilterDeltaPos *= lpFilterDamping;
-                        }
-                        else
-                        {
-                            lpFilterPos = sample;
-                            lpFilterDeltaPos = 0.0f;
-                        }
-                        lpFilterPos += lpFilterDeltaPos;
+                            float lpFilterOldPos = lpFilterPos;
+                            lpFilterCutoff *= lpFilterDeltaCutoff;
+                            if (lpFilterCutoff < 0.0f) lpFilterCutoff = 0.0f;
+                            else if (lpFilterCutoff > 0.1f) lpFilterCutoff = 0.1f;
 
-                        hpFilterPos += lpFilterPos - lpFilterOldPos;
-                        hpFilterPos *= 1.0f - hpFilterCutoff;
-                        sample = hpFilterPos;
+                            if (lpFilterOn)
+                            {
+                                lpFilterDeltaPos += (sample - lpFilterPos) * lpFilterCutoff;
+                                lpFilterDeltaPos *= lpFilterDamping;
+                            }
+                            else
+                            {
+                                lpFilterPos = sample;
+                                lpFilterDeltaPos = 0.0f;
+                            }
+                            lpFilterPos += lpFilterDeltaPos;
+
+                            hpFilterPos += lpFilterPos - lpFilterOldPos;
+                            hpFilterPos *= 1.0f - hpFilterCutoff;
+                            sample = hpFilterPos;
+                        }
 
                         // Apply Flanger
                         phaserBuffer[phaserPos & 1023] = sample;
@@ -360,26 +364,29 @@ namespace RetroSoundSynthesizer.Runtime
                         }
 
                         // Apply Filters
-                        float lpFilterOldPos = lpFilterPos;
-                        lpFilterCutoff *= lpFilterDeltaCutoff;
-                        if (lpFilterCutoff < 0.0f) lpFilterCutoff = 0.0f;
-                        else if (lpFilterCutoff > 0.1f) lpFilterCutoff = 0.1f;
-
-                        if (lpFilterOn)
+                        if (filtersActive)
                         {
-                            lpFilterDeltaPos += (sample - lpFilterPos) * lpFilterCutoff;
-                            lpFilterDeltaPos *= lpFilterDamping;
-                        }
-                        else
-                        {
-                            lpFilterPos = sample;
-                            lpFilterDeltaPos = 0.0f;
-                        }
-                        lpFilterPos += lpFilterDeltaPos;
+                            float lpFilterOldPos = lpFilterPos;
+                            lpFilterCutoff *= lpFilterDeltaCutoff;
+                            if (lpFilterCutoff < 0.0f) lpFilterCutoff = 0.0f;
+                            else if (lpFilterCutoff > 0.1f) lpFilterCutoff = 0.1f;
 
-                        hpFilterPos += lpFilterPos - lpFilterOldPos;
-                        hpFilterPos *= 1.0f - hpFilterCutoff;
-                        sample = hpFilterPos;
+                            if (lpFilterOn)
+                            {
+                                lpFilterDeltaPos += (sample - lpFilterPos) * lpFilterCutoff;
+                                lpFilterDeltaPos *= lpFilterDamping;
+                            }
+                            else
+                            {
+                                lpFilterPos = sample;
+                                lpFilterDeltaPos = 0.0f;
+                            }
+                            lpFilterPos += lpFilterDeltaPos;
+
+                            hpFilterPos += lpFilterPos - lpFilterOldPos;
+                            hpFilterPos *= 1.0f - hpFilterCutoff;
+                            sample = hpFilterPos;
+                        }
 
                         superSample += sample;
                     }

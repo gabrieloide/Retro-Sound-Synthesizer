@@ -455,15 +455,49 @@ namespace RetroSoundSynthesizer.Editor
             Type audioUtilClass = typeof(UnityEditor.AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
             if (audioUtilClass != null)
             {
+                // Try finding PlayPreviewClip first, fallback to PlayClip with parameter matching
                 System.Reflection.MethodInfo playMethod = audioUtilClass.GetMethod("PlayPreviewClip",
-                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public,
+                    null, new Type[] { typeof(AudioClip), typeof(int), typeof(bool) }, null);
+
+                if (playMethod == null)
+                {
+                    playMethod = audioUtilClass.GetMethod("PlayClip",
+                        System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public,
+                        null, new Type[] { typeof(AudioClip), typeof(int), typeof(bool) }, null);
+                }
+
+                if (playMethod == null)
+                {
+                    playMethod = audioUtilClass.GetMethod("PlayPreviewClip",
+                        System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                }
+
+                if (playMethod == null)
+                {
+                    playMethod = audioUtilClass.GetMethod("PlayClip",
+                        System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                }
+
                 if (playMethod != null)
                 {
-                    playMethod.Invoke(null, new object[] { clip, 0, false });
+                    var parameters = playMethod.GetParameters();
+                    if (parameters.Length == 3)
+                    {
+                        playMethod.Invoke(null, new object[] { clip, 0, false });
+                    }
+                    else if (parameters.Length == 1)
+                    {
+                        playMethod.Invoke(null, new object[] { clip });
+                    }
+                    else if (parameters.Length == 2)
+                    {
+                        playMethod.Invoke(null, new object[] { clip, 0 });
+                    }
                 }
                 else
                 {
-                    Debug.LogWarning("[ProceduralAudioEditor] PlayPreviewClip method not found on AudioUtil class.");
+                    Debug.LogWarning("[ProceduralAudioEditor] Could not find editor audio play method in AudioUtil.");
                 }
             }
             else
@@ -479,6 +513,12 @@ namespace RetroSoundSynthesizer.Editor
             {
                 System.Reflection.MethodInfo stopMethod = audioUtilClass.GetMethod("StopAllPreviewClips",
                     System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                if (stopMethod == null)
+                {
+                    stopMethod = audioUtilClass.GetMethod("StopAllClips",
+                        System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                }
+
                 if (stopMethod != null)
                 {
                     stopMethod.Invoke(null, null);

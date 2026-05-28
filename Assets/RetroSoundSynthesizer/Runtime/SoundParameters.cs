@@ -26,6 +26,23 @@ namespace RetroSoundSynthesizer.Runtime
         Bit8 = 8
     }
 
+    public enum LfoTarget
+    {
+        None = 0,
+        Pitch = 1,
+        Cutoff = 2,
+        DutyCycle = 3,
+        Volume = 4
+    }
+
+    public enum LfoWaveform
+    {
+        Sine = 0,
+        Triangle = 1,
+        Square = 2,
+        Sawtooth = 3
+    }
+
     [Serializable]
     public class SoundParameters
     {
@@ -55,23 +72,33 @@ namespace RetroSoundSynthesizer.Runtime
 
         // Duty Cycle (for Square wave)
         [Range(0f, 1f)] public float dutyCycle = 0.0f;       // sfxr squareDuty
-        [Range(-1f, 1f)] public float dutySweep = 0.0f;       // sfxr dutySweep (named to avoid duplicate 'sweep' field)
+        [Range(-1f, 1f)] public float dutySweep = 0.0f;       // sfxr dutySweep
 
         // Retrigger
         [Range(0f, 1f)] public float rate = 0.0f;            // sfxr repeatSpeed
 
         // Flanger
         [Range(-1f, 1f)] public float offset = 0.0f;          // sfxr phaserOffset
-        [Range(-1f, 1f)] public float flangerSweep = 0.0f;   // sfxr phaserSweep (named to avoid duplicate 'sweep' field)
+        [Range(-1f, 1f)] public float flangerSweep = 0.0f;   // sfxr phaserSweep
 
         // Low-Pass Filter
-        [Range(0f, 1f)] public float lpCutoffFrequency = 1.0f; // sfxr lpFilterCutoff (default 1.0f, named to avoid 'cutoffFrequency' duplicate)
+        [Range(0f, 1f)] public float lpCutoffFrequency = 1.0f; // sfxr lpFilterCutoff
         [Range(-1f, 1f)] public float lpCutoffSweep = 0.0f;    // sfxr lpFilterCutoffSweep
         [Range(0f, 1f)] public float resonance = 0.0f;         // sfxr lpFilterResonance
 
         // High-Pass Filter
-        [Range(0f, 1f)] public float hpCutoffFrequency = 0.0f; // sfxr hpFilterCutoff (default 0.0f, named to avoid 'cutoffFrequency' duplicate)
+        [Range(0f, 1f)] public float hpCutoffFrequency = 0.0f; // sfxr hpFilterCutoff
         [Range(-1f, 1f)] public float hpCutoffSweep = 0.0f;    // sfxr hpFilterCutoffSweep
+
+        // LFO Modulation (AI-assisted & Advanced sound design)
+        public LfoTarget lfoTarget = LfoTarget.None;
+        public LfoWaveform lfoWaveform = LfoWaveform.Sine;
+        [Range(0f, 1f)] public float lfoSpeed = 0.0f;
+        [Range(0f, 1f)] public float lfoDepth = 0.0f;
+
+        // Mixing & Layering
+        [Range(0f, 5f)] public float delay = 0.0f;             // Delay in seconds before this layer plays
+        public List<SoundParameters> layers = new List<SoundParameters>();
 
         // Output configuration
         public SampleRateOption sampleRate = SampleRateOption.Rate44k;
@@ -80,7 +107,7 @@ namespace RetroSoundSynthesizer.Runtime
 
         public SoundParameters Clone()
         {
-            return new SoundParameters
+            var clone = new SoundParameters
             {
                 soundName = this.soundName,
                 waveType = this.waveType,
@@ -106,10 +133,26 @@ namespace RetroSoundSynthesizer.Runtime
                 resonance = this.resonance,
                 hpCutoffFrequency = this.hpCutoffFrequency,
                 hpCutoffSweep = this.hpCutoffSweep,
+                lfoTarget = this.lfoTarget,
+                lfoWaveform = this.lfoWaveform,
+                lfoSpeed = this.lfoSpeed,
+                lfoDepth = this.lfoDepth,
+                delay = this.delay,
                 sampleRate = this.sampleRate,
                 sampleSize = this.sampleSize,
-                masterGain = this.masterGain
+                masterGain = this.masterGain,
+                layers = new List<SoundParameters>()
             };
+
+            if (this.layers != null)
+            {
+                foreach (var layer in this.layers)
+                {
+                    clone.layers.Add(layer.Clone());
+                }
+            }
+
+            return clone;
         }
 
         public void Randomize()
@@ -152,6 +195,25 @@ namespace RetroSoundSynthesizer.Runtime
             hpCutoffFrequency = Mathf.Pow(GetRandom(), 5);
             hpCutoffSweep = Mathf.Pow(GetRandom() * 2f - 1f, 5);
 
+            // Randomize LFO sometimes
+            if (GetRandom() < 0.4f)
+            {
+                lfoTarget = (LfoTarget)rand.Next(1, 5);
+                lfoWaveform = (LfoWaveform)rand.Next(0, 4);
+                lfoSpeed = GetRandom() * 0.8f;
+                lfoDepth = GetRandom() * 0.8f;
+            }
+            else
+            {
+                lfoTarget = LfoTarget.None;
+                lfoSpeed = 0.0f;
+                lfoDepth = 0.0f;
+            }
+
+            // Clear layers on simple randomize to keep things fast
+            layers.Clear();
+            delay = 0.0f;
+
             if (attackTime + sustainTime + decayTime < 0.2f)
             {
                 sustainTime = 0.2f + GetRandom() * 0.3f;
@@ -169,7 +231,6 @@ namespace RetroSoundSynthesizer.Runtime
             }
         }
     }
-
 
     [Serializable]
     public class SoundPack

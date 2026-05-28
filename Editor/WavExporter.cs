@@ -9,9 +9,9 @@ namespace RetroSoundSynthesizer.Editor
     public static class WavExporter
     {
         /// <summary>
-        /// Downsamples, formats, and exports synthesized audio buffer to a standard RIFF/WAVE file in the Assets directory.
+        /// Downsamples, formats, and exports synthesized audio buffer to a standard RIFF/WAVE file in the specified project directory.
         /// </summary>
-        public static string ExportToWav(float[] masterBuffer, SampleRateOption rateOption, SampleSizeOption sizeOption, string fileName)
+        public static string ExportToWav(float[] masterBuffer, SampleRateOption rateOption, SampleSizeOption sizeOption, string fileName, string exportDirectory = "Assets")
         {
             if (masterBuffer == null || masterBuffer.Length == 0)
             {
@@ -52,7 +52,6 @@ namespace RetroSoundSynthesizer.Editor
                 formattedData = new byte[targetBuffer.Length * 2];
                 for (int i = 0; i < targetBuffer.Length; i++)
                 {
-                    // Map -1.0 to 1.0 float to Int16 (-32768 to 32767)
                     short val = (short)Mathf.Clamp(targetBuffer[i] * 32767f, -32768f, 32767f);
                     formattedData[i * 2] = (byte)(val & 0xff);
                     formattedData[i * 2 + 1] = (byte)((val >> 8) & 0xff);
@@ -63,7 +62,6 @@ namespace RetroSoundSynthesizer.Editor
                 formattedData = new byte[targetBuffer.Length];
                 for (int i = 0; i < targetBuffer.Length; i++)
                 {
-                    // Map -1.0 to 1.0 float to UInt8 (0 to 255, where 128 is center/silence)
                     byte val = (byte)Mathf.Clamp((targetBuffer[i] * 127f) + 128f, 0f, 255f);
                     formattedData[i] = val;
                 }
@@ -123,18 +121,40 @@ namespace RetroSoundSynthesizer.Editor
             Buffer.BlockCopy(header, 0, fullFile, 0, header.Length);
             Buffer.BlockCopy(formattedData, 0, fullFile, header.Length, formattedData.Length);
 
-            // 5. Clean name and write to the Assets folder
+            // 5. Clean name and calculate export paths
             string sanitizedName = string.IsNullOrEmpty(fileName) ? "retro_sound" : fileName.Trim();
             foreach (char c in Path.GetInvalidFileNameChars())
             {
                 sanitizedName = sanitizedName.Replace(c, '_');
             }
 
-            string relativePath = $"Assets/{sanitizedName}.wav";
-            string absolutePath = Path.Combine(Application.dataPath, $"{sanitizedName}.wav");
+            // Standardize folder string format (relative starting with Assets)
+            string folder = string.IsNullOrEmpty(exportDirectory) ? "Assets" : exportDirectory.Replace('\\', '/').Trim();
+            if (!folder.StartsWith("Assets"))
+            {
+                folder = "Assets/" + folder;
+            }
+
+            // Clean trailing slash
+            if (folder.EndsWith("/"))
+            {
+                folder = folder.Substring(0, folder.Length - 1);
+            }
+
+            // Project absolute root path
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string absoluteFolderPath = Path.Combine(projectRoot, folder);
 
             try
             {
+                if (!Directory.Exists(absoluteFolderPath))
+                {
+                    Directory.CreateDirectory(absoluteFolderPath);
+                }
+
+                string relativePath = Path.Combine(folder, $"{sanitizedName}.wav").Replace('\\', '/');
+                string absolutePath = Path.Combine(absoluteFolderPath, $"{sanitizedName}.wav");
+
                 File.WriteAllBytes(absolutePath, fullFile);
                 AssetDatabase.Refresh();
                 Debug.Log($"[WavExporter] Saved procedural audio file to: {relativePath}");
@@ -142,7 +162,7 @@ namespace RetroSoundSynthesizer.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[WavExporter] Failed to write file: {ex.Message}");
+                Debug.LogError($"[WavExporter] Failed to write WAV file: {ex.Message}");
                 return null;
             }
         }

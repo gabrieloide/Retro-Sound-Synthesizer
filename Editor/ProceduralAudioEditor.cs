@@ -35,6 +35,7 @@ namespace RetroSoundSynthesizer.Editor
         private float jsonTextAreaHeight = 120f;
         private Vector2 jsonTextScrollPos;
         private bool isResizingJson = false;
+        private string exportFolder = "Assets";
 
         // Seeded corners for 2D mixer
         private SoundParameters cornerLaser;
@@ -53,6 +54,7 @@ namespace RetroSoundSynthesizer.Editor
             UpdateJsonTextArea();
             auditionHistory.Clear();
             activeLayerIndex = -1;
+            exportFolder = EditorPrefs.GetString("RetroSynth_ExportFolder", "Assets");
         }
 
         private void InitializePadCorners()
@@ -122,6 +124,7 @@ namespace RetroSoundSynthesizer.Editor
             if (EditorGUI.EndChangeCheck())
             {
                 UpdateJsonTextArea();
+                EditorPrefs.SetString("RetroSynth_ExportFolder", exportFolder);
             }
         }
 
@@ -557,12 +560,40 @@ namespace RetroSoundSynthesizer.Editor
             currentSound.baseSound.sampleSize = (SampleSizeOption)EditorGUILayout.EnumPopup("Sample Resolution", currentSound.baseSound.sampleSize);
             currentSound.baseSound.masterGain = EditorGUILayout.Slider("Master Gain", currentSound.baseSound.masterGain, 0f, 1f);
 
+            GUILayout.Space(6);
+            GUILayout.BeginHorizontal();
+            exportFolder = EditorGUILayout.TextField("Export Folder", exportFolder);
+            if (GUILayout.Button("📁 Choose...", GUILayout.Width(75)))
+            {
+                string selectedPath = EditorUtility.OpenFolderPanel("Select Export Folder", "Assets", "");
+                if (!string.IsNullOrEmpty(selectedPath))
+                {
+                    string projectPath = Path.GetFullPath(Path.Combine(Application.dataPath, "../")).Replace('\\', '/');
+                    selectedPath = selectedPath.Replace('\\', '/');
+                    if (selectedPath.StartsWith(projectPath))
+                    {
+                        exportFolder = selectedPath.Substring(projectPath.Length);
+                        if (exportFolder.StartsWith("/")) exportFolder = exportFolder.Substring(1);
+                    }
+                    else if (selectedPath.Contains("Assets/"))
+                    {
+                        int assetsIdx = selectedPath.IndexOf("Assets/");
+                        exportFolder = selectedPath.Substring(assetsIdx);
+                    }
+                    else
+                    {
+                        EditorUtility.DisplayDialog("Invalid Folder", "Please select a folder inside the Unity project's Assets directory.", "OK");
+                    }
+                }
+            }
+            GUILayout.EndHorizontal();
+
             GUILayout.Space(10);
 
             if (GUILayout.Button("💾 EXPORT .WAV FILE", GUILayout.Height(35)))
             {
                 float[] buffer = SynthEngine.Synthesize(currentSound);
-                string savedPath = WavExporter.ExportToWav(buffer, currentSound.baseSound.sampleRate, currentSound.baseSound.sampleSize, currentSound.baseSound.soundName);
+                string savedPath = WavExporter.ExportToWav(buffer, currentSound.baseSound.sampleRate, currentSound.baseSound.sampleSize, currentSound.baseSound.soundName, exportFolder);
                 if (!string.IsNullOrEmpty(savedPath))
                 {
                     EditorUtility.DisplayDialog("Procedural Synth", $"Saved procedural .wav sound successfully at:\n{savedPath}", "OK");
@@ -646,7 +677,7 @@ namespace RetroSoundSynthesizer.Editor
                     {
                         var sound = currentPack.sounds[i];
                         float[] buffer = SynthEngine.Synthesize(sound);
-                        string savedPath = WavExporter.ExportToWav(buffer, sound.baseSound.sampleRate, sound.baseSound.sampleSize, sound.baseSound.soundName);
+                        string savedPath = WavExporter.ExportToWav(buffer, sound.baseSound.sampleRate, sound.baseSound.sampleSize, sound.baseSound.soundName, exportFolder);
                         if (!string.IsNullOrEmpty(savedPath))
                         {
                             successCount++;

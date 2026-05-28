@@ -94,6 +94,8 @@ namespace RetroSoundSynthesizer.Editor
                 fixedHeight = 25
             };
 
+            EditorGUI.BeginChangeCheck();
+
             EditorGUILayout.BeginHorizontal();
 
             // =========================================================================
@@ -116,6 +118,11 @@ namespace RetroSoundSynthesizer.Editor
             EditorGUILayout.EndVertical();
 
             EditorGUILayout.EndHorizontal();
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                UpdateJsonTextArea();
+            }
         }
 
         private void DrawVerticalDivider()

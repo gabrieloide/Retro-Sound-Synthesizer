@@ -26,6 +26,9 @@ namespace RetroSoundSynthesizer.Editor
         private Vector2 scrollPosLeft;
         private Vector2 padCoordinates = new Vector2(0.5f, 0.5f);
         private string jsonClipboardText = "";
+        private float jsonTextAreaHeight = 120f;
+        private Vector2 jsonTextScrollPos;
+        private bool isResizingJson = false;
 
         // Seeded corners for 2D mixer
         private SoundParameters cornerLaser;
@@ -385,8 +388,44 @@ namespace RetroSoundSynthesizer.Editor
 
             // Batch & Clipboard Operations
             EditorGUILayout.BeginVertical(sectionStyle);
+            
+            GUILayout.BeginHorizontal();
             GUILayout.Label("📋 JSON Serialization Data", EditorStyles.boldLabel);
-            jsonClipboardText = EditorGUILayout.TextArea(jsonClipboardText, GUILayout.Height(100));
+            GUILayout.FlexibleSpace();
+            GUILayout.Label("↕️ Height", EditorStyles.miniLabel);
+            jsonTextAreaHeight = EditorGUILayout.Slider("", jsonTextAreaHeight, 80f, 450f, GUILayout.Width(130));
+            GUILayout.EndHorizontal();
+
+            // Scrollable Text Area
+            jsonTextScrollPos = EditorGUILayout.BeginScrollView(jsonTextScrollPos, GUILayout.Height(jsonTextAreaHeight));
+            jsonClipboardText = EditorGUILayout.TextArea(jsonClipboardText, GUILayout.ExpandHeight(true));
+            EditorGUILayout.EndScrollView();
+
+            // Interactive Draggable Splitter Handle Bar
+            Rect splitterRect = GUILayoutUtility.GetRect(10, 8, GUILayout.ExpandWidth(true));
+            // Draw a subtle line for visual drag guide
+            GUI.Box(new Rect(splitterRect.x, splitterRect.y + 3, splitterRect.width, 2), "");
+            EditorGUIUtility.AddCursorRect(splitterRect, MouseCursor.ResizeVertical);
+
+            Event currentEvent = Event.current;
+            if (currentEvent.type == EventType.MouseDown && splitterRect.Contains(currentEvent.mousePosition))
+            {
+                isResizingJson = true;
+            }
+
+            if (isResizingJson)
+            {
+                if (currentEvent.type == EventType.MouseDrag)
+                {
+                    jsonTextAreaHeight += currentEvent.deltaY;
+                    jsonTextAreaHeight = Mathf.Clamp(jsonTextAreaHeight, 80f, 450f);
+                    Repaint();
+                }
+                else if (currentEvent.type == EventType.MouseUp || currentEvent.rawType == EventType.MouseUp)
+                {
+                    isResizingJson = false;
+                }
+            }
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("🔗 Serialize (Copy JSON)"))

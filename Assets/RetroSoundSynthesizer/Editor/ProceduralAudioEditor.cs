@@ -417,7 +417,7 @@ namespace RetroSoundSynthesizer.Editor
             {
                 if (currentEvent.type == EventType.MouseDrag)
                 {
-                    jsonTextAreaHeight += currentEvent.deltaY;
+                    jsonTextAreaHeight += currentEvent.delta.y;
                     jsonTextAreaHeight = Mathf.Clamp(jsonTextAreaHeight, 80f, 450f);
                     Repaint();
                 }

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using RetroSoundSynthesizer.Runtime;
@@ -20,6 +21,10 @@ namespace RetroSoundSynthesizer.Editor
         private SoundPack currentPack = new SoundPack();
         private bool isSoundPackLoaded = false;
         private AudioClip previewClip;
+
+        // Advanced features state
+        private List<SoundParameters> auditionHistory = new List<SoundParameters>();
+        private int activeLayerIndex = -1; // -1 = Capa Base (Principal), 0+ = Capas adicionales
 
         // Editor layout variables
         private int controlMode = 0; // 0 = Sliders Manuales, 1 = Preset Pad / 2D Mixer
@@ -46,6 +51,8 @@ namespace RetroSoundSynthesizer.Editor
         {
             InitializePadCorners();
             UpdateJsonTextArea();
+            auditionHistory.Clear();
+            activeLayerIndex = -1;
         }
 
         private void InitializePadCorners()
@@ -120,12 +127,94 @@ namespace RetroSoundSynthesizer.Editor
             GUI.color = oldColor;
         }
 
+        private SoundParameters GetActiveEditingParams()
+        {
+            if (currentParams == null) return null;
+            if (currentParams.layers == null) currentParams.layers = new List<SoundParameters>();
+            if (activeLayerIndex == -1 || activeLayerIndex >= currentParams.layers.Count)
+            {
+                return currentParams;
+            }
+            return currentParams.layers[activeLayerIndex];
+        }
+
         private void DrawLeftColumn()
         {
             GUILayout.Space(10);
             GUILayout.Label("🎛️ CONTROLES DE SÍNTESIS", headerStyle);
 
-            // Tab-Switch control
+            // =========================================================================
+            // GESTIÓN Y SELECCIÓN DE CAPAS (LAYER MIXER)
+            // =========================================================================
+            EditorGUILayout.BeginVertical(sectionStyle);
+            GUILayout.Label("🔀 Mezclador de Capas (Sound Layers)", EditorStyles.boldLabel);
+            
+            int totalLayers = currentParams.layers != null ? currentParams.layers.Count : 0;
+            string[] layerTabs = new string[1 + totalLayers];
+            layerTabs[0] = "Capa Base";
+            for (int i = 0; i < totalLayers; i++)
+            {
+                layerTabs[i + 1] = $"Capa #{i + 1} ({currentParams.layers[i].waveType})";
+            }
+
+            int selectedTab = activeLayerIndex + 1;
+            int newTab = GUILayout.Toolbar(selectedTab, layerTabs, GUILayout.Height(22));
+            activeLayerIndex = newTab - 1;
+
+            GUILayout.Space(5);
+            GUILayout.BeginHorizontal();
+            
+            if (GUILayout.Button("➕ Añadir Capa", GUILayout.Height(22)))
+            {
+                if (currentParams.layers == null) currentParams.layers = new List<SoundParameters>();
+                
+                // Clone base sound parameters to provide a beautiful starting point
+                SoundParameters newLayer = currentParams.Clone();
+                newLayer.layers.Clear();
+                newLayer.soundName = $"Capa_{currentParams.layers.Count + 1}";
+                newLayer.delay = 0.15f * (currentParams.layers.Count + 1);
+                newLayer.masterGain = 0.35f; // slightly quieter as a layer
+
+                currentParams.layers.Add(newLayer);
+                activeLayerIndex = currentParams.layers.Count - 1; // select the newly added layer
+                UpdateJsonTextArea();
+            }
+
+            if (activeLayerIndex >= 0 && currentParams.layers != null && activeLayerIndex < currentParams.layers.Count)
+            {
+                GUI.backgroundColor = new Color(0.9f, 0.3f, 0.3f);
+                if (GUILayout.Button("🗑️ Eliminar Capa", GUILayout.Height(22)))
+                {
+                    currentParams.layers.RemoveAt(activeLayerIndex);
+                    activeLayerIndex = activeLayerIndex - 1; // fallback to base or previous layer
+                    UpdateJsonTextArea();
+                }
+                GUI.backgroundColor = Color.white;
+            }
+
+            GUILayout.EndHorizontal();
+
+            // Layer-specific settings slider (Delay and Layer Master Gain)
+            if (activeLayerIndex >= 0 && currentParams.layers != null && activeLayerIndex < currentParams.layers.Count)
+            {
+                GUILayout.Space(6);
+                var activeLayer = currentParams.layers[activeLayerIndex];
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                GUILayout.Label($"Ajustes Específicos de Capa #{activeLayerIndex + 1}", EditorStyles.miniBoldLabel);
+                activeLayer.delay = EditorGUILayout.Slider("Retardo (Delay en Seg)", activeLayer.delay, 0f, 4f);
+                activeLayer.masterGain = EditorGUILayout.Slider("Ganancia de Capa", activeLayer.masterGain, 0f, 1f);
+                EditorGUILayout.EndVertical();
+            }
+            else
+            {
+                GUILayout.Space(4);
+                GUILayout.Label("Editando los parámetros de la Capa Base. Se sumará con las capas añadidas.", EditorStyles.miniLabel);
+            }
+
+            EditorGUILayout.EndVertical();
+            GUILayout.Space(8);
+
+            // Tab-Switch control for Synthesis Controls
             string[] modes = { "🎚️ Sliders Manuales (sfxr)", "🎯 Preset Pad / Mezclador 2D" };
             int newMode = GUILayout.Toolbar(controlMode, modes, GUILayout.Height(30));
             if (newMode != controlMode)
@@ -156,87 +245,105 @@ namespace RetroSoundSynthesizer.Editor
 
         private void DrawManualSliders()
         {
+            SoundParameters target = GetActiveEditingParams();
+            if (target == null) return;
+
             // Section: Waveform selection
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("Waveform Type", EditorStyles.boldLabel);
             GUILayout.Space(4);
             string[] waveNames = { "Square", "Sawtooth", "Sine", "Noise" };
-            currentParams.waveType = (WaveType)GUILayout.SelectionGrid((int)currentParams.waveType, waveNames, 4, selectionGridStyle);
+            target.waveType = (WaveType)GUILayout.SelectionGrid((int)target.waveType, waveNames, 4, selectionGridStyle);
             EditorGUILayout.EndVertical();
 
             // Section: Envelope
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("📬 Envelope (ADSR)", EditorStyles.boldLabel);
-            currentParams.attackTime = EditorGUILayout.Slider("Attack Time", currentParams.attackTime, 0f, 1f);
-            currentParams.sustainTime = EditorGUILayout.Slider("Sustain Time", currentParams.sustainTime, 0f, 1f);
-            currentParams.sustainPunch = EditorGUILayout.Slider("Sustain Punch", currentParams.sustainPunch, 0f, 1f);
-            currentParams.decayTime = EditorGUILayout.Slider("Decay Time", currentParams.decayTime, 0f, 1f);
+            target.attackTime = EditorGUILayout.Slider("Attack Time", target.attackTime, 0f, 1f);
+            target.sustainTime = EditorGUILayout.Slider("Sustain Time", target.sustainTime, 0f, 1f);
+            target.sustainPunch = EditorGUILayout.Slider("Sustain Punch", target.sustainPunch, 0f, 1f);
+            target.decayTime = EditorGUILayout.Slider("Decay Time", target.decayTime, 0f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: Frequency
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("🎵 Frequency Modulation", EditorStyles.boldLabel);
-            currentParams.startFrequency = EditorGUILayout.Slider("Start Frequency", currentParams.startFrequency, 0f, 1f);
-            currentParams.minFrequencyCutoff = EditorGUILayout.Slider("Min Cutoff Frequency", currentParams.minFrequencyCutoff, 0f, 1f);
-            currentParams.slide = EditorGUILayout.Slider("Slide Speed", currentParams.slide, -1f, 1f);
-            currentParams.deltaSlide = EditorGUILayout.Slider("Delta Slide (Acc)", currentParams.deltaSlide, -1f, 1f);
+            target.startFrequency = EditorGUILayout.Slider("Start Frequency", target.startFrequency, 0f, 1f);
+            target.minFrequencyCutoff = EditorGUILayout.Slider("Min Cutoff Frequency", target.minFrequencyCutoff, 0f, 1f);
+            target.slide = EditorGUILayout.Slider("Slide Speed", target.slide, -1f, 1f);
+            target.deltaSlide = EditorGUILayout.Slider("Delta Slide (Acc)", target.deltaSlide, -1f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: Vibrato
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("💓 Vibrato Modulation", EditorStyles.boldLabel);
-            currentParams.depth = EditorGUILayout.Slider("Vibrato Depth", currentParams.depth, 0f, 1f);
-            currentParams.speed = EditorGUILayout.Slider("Vibrato Speed", currentParams.speed, 0f, 1f);
+            target.depth = EditorGUILayout.Slider("Vibrato Depth", target.depth, 0f, 1f);
+            target.speed = EditorGUILayout.Slider("Vibrato Speed", target.speed, 0f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: Arpeggiation
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("🛹 Arpeggiation / Jumps", EditorStyles.boldLabel);
-            currentParams.frequencyMult = EditorGUILayout.Slider("Pitch Jump Amount", currentParams.frequencyMult, -1f, 1f);
-            currentParams.changeSpeed = EditorGUILayout.Slider("Pitch Jump Speed", currentParams.changeSpeed, 0f, 1f);
+            target.frequencyMult = EditorGUILayout.Slider("Pitch Jump Amount", target.frequencyMult, -1f, 1f);
+            target.changeSpeed = EditorGUILayout.Slider("Pitch Jump Speed", target.changeSpeed, 0f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: Duty Cycle (Square Wave)
-            if (currentParams.waveType == WaveType.Square)
+            if (target.waveType == WaveType.Square)
             {
                 EditorGUILayout.BeginVertical(sectionStyle);
                 GUILayout.Label("🔲 Square wave Duty Cycle", EditorStyles.boldLabel);
-                currentParams.dutyCycle = EditorGUILayout.Slider("Duty Cycle", currentParams.dutyCycle, 0f, 1f);
-                currentParams.dutySweep = EditorGUILayout.Slider("Duty Sweep Speed", currentParams.dutySweep, -1f, 1f);
+                target.dutyCycle = EditorGUILayout.Slider("Duty Cycle", target.dutyCycle, 0f, 1f);
+                target.dutySweep = EditorGUILayout.Slider("Duty Sweep Speed", target.dutySweep, -1f, 1f);
                 EditorGUILayout.EndVertical();
             }
 
             // Section: Retrigger
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("🔁 Retrigger Speed", EditorStyles.boldLabel);
-            currentParams.rate = EditorGUILayout.Slider("Retrigger Rate", currentParams.rate, 0f, 1f);
+            target.rate = EditorGUILayout.Slider("Retrigger Rate", target.rate, 0f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: Flanger
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("🌀 Flanger / Phaser Effect", EditorStyles.boldLabel);
-            currentParams.offset = EditorGUILayout.Slider("Flanger Offset", currentParams.offset, -1f, 1f);
-            currentParams.flangerSweep = EditorGUILayout.Slider("Flanger Sweep Speed", currentParams.flangerSweep, -1f, 1f);
+            target.offset = EditorGUILayout.Slider("Flanger Offset", target.offset, -1f, 1f);
+            target.flangerSweep = EditorGUILayout.Slider("Flanger Sweep Speed", target.flangerSweep, -1f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: Low-Pass Filter
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("🟢 Low-Pass Filter", EditorStyles.boldLabel);
-            currentParams.lpCutoffFrequency = EditorGUILayout.Slider("LP Cutoff Frequency", currentParams.lpCutoffFrequency, 0f, 1f);
-            currentParams.lpCutoffSweep = EditorGUILayout.Slider("LP Cutoff Sweep", currentParams.lpCutoffSweep, -1f, 1f);
-            currentParams.resonance = EditorGUILayout.Slider("LP Resonance", currentParams.resonance, 0f, 1f);
+            target.lpCutoffFrequency = EditorGUILayout.Slider("LP Cutoff Frequency", target.lpCutoffFrequency, 0f, 1f);
+            target.lpCutoffSweep = EditorGUILayout.Slider("LP Cutoff Sweep", target.lpCutoffSweep, -1f, 1f);
+            target.resonance = EditorGUILayout.Slider("LP Resonance", target.resonance, 0f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: High-Pass Filter
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("🔴 High-Pass Filter", EditorStyles.boldLabel);
-            currentParams.hpCutoffFrequency = EditorGUILayout.Slider("HP Cutoff Frequency", currentParams.hpCutoffFrequency, 0f, 1f);
-            currentParams.hpCutoffSweep = EditorGUILayout.Slider("HP Cutoff Sweep", currentParams.hpCutoffSweep, -1f, 1f);
+            target.hpCutoffFrequency = EditorGUILayout.Slider("HP Cutoff Frequency", target.hpCutoffFrequency, 0f, 1f);
+            target.hpCutoffSweep = EditorGUILayout.Slider("HP Cutoff Sweep", target.hpCutoffSweep, -1f, 1f);
+            EditorGUILayout.EndVertical();
+
+            // Section: LFO Modulation (Advanced LFO)
+            EditorGUILayout.BeginVertical(sectionStyle);
+            GUILayout.Label("🌀 Modulación LFO (Filtros, Tono y Volumen)", EditorStyles.boldLabel);
+            target.lfoTarget = (LfoTarget)EditorGUILayout.EnumPopup("LFO Destino (Target)", target.lfoTarget);
+            if (target.lfoTarget != LfoTarget.None)
+            {
+                target.lfoWaveform = (LfoWaveform)EditorGUILayout.EnumPopup("LFO Forma de Onda", target.lfoWaveform);
+                target.lfoSpeed = EditorGUILayout.Slider("LFO Velocidad (Speed)", target.lfoSpeed, 0f, 1f);
+                target.lfoDepth = EditorGUILayout.Slider("LFO Profundidad (Depth)", target.lfoDepth, 0f, 1f);
+            }
             EditorGUILayout.EndVertical();
         }
 
         private void Draw2DMixerPad()
         {
+            SoundParameters target = GetActiveEditingParams();
+            if (target == null) return;
+
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("🎯 2D Bilinear Mixer Pad", EditorStyles.boldLabel);
             GUILayout.Label("Drag the cyan cursor to smoothly interpolate procedural parameters in real-time.", EditorStyles.miniLabel);
@@ -322,15 +429,39 @@ namespace RetroSoundSynthesizer.Editor
 
         private void GenerateFullPreset(string typeName)
         {
-            SynthEngine.GeneratePreset(currentParams, typeName);
+            SoundParameters target = GetActiveEditingParams();
+            SynthEngine.GeneratePreset(target, typeName);
             UpdateJsonTextArea();
             PlayCurrentAudio();
+        }
+
+        private void AddToAuditionHistory(SoundParameters p)
+        {
+            if (p == null) return;
+
+            // Check if identical to the last item in the history to avoid duplicate listings
+            if (auditionHistory.Count > 0)
+            {
+                string newJson = JsonUtility.ToJson(p);
+                string lastJson = JsonUtility.ToJson(auditionHistory[auditionHistory.Count - 1]);
+                if (newJson == lastJson) return; // ignore duplicates
+            }
+
+            auditionHistory.Add(p.Clone());
+
+            // Limit history to 12 items max
+            if (auditionHistory.Count > 12)
+            {
+                auditionHistory.RemoveAt(0);
+            }
         }
 
         private void DrawRightColumn()
         {
             GUILayout.Space(10);
             GUILayout.Label("💾 FORMATO Y EXPORTACIÓN", headerStyle);
+
+            SoundParameters target = GetActiveEditingParams();
 
             // Sound Name Field
             EditorGUILayout.BeginVertical(sectionStyle);
@@ -353,19 +484,66 @@ namespace RetroSoundSynthesizer.Editor
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("🎲 Randomize Settings"))
             {
-                currentParams.Randomize();
+                target.Randomize();
                 UpdateJsonTextArea();
                 PlayCurrentAudio();
             }
             if (GUILayout.Button("🧬 Mutate Local (Mutar)"))
             {
-                SynthEngine.Mutate(currentParams, 0.06f);
+                SynthEngine.Mutate(target, 0.06f);
                 UpdateJsonTextArea();
                 PlayCurrentAudio();
             }
             GUILayout.EndHorizontal();
 
             GUILayout.Space(10);
+
+            // Audition History Section (Super convenient!)
+            if (auditionHistory.Count > 0)
+            {
+                EditorGUILayout.BeginVertical(sectionStyle);
+                GUILayout.Label("📜 Historial de Audición", EditorStyles.boldLabel);
+                GUILayout.Label("Haz click para restaurar un sonido previo:", EditorStyles.miniLabel);
+                GUILayout.Space(4);
+
+                for (int h = auditionHistory.Count - 1; h >= 0; h--)
+                {
+                    var histItem = auditionHistory[h];
+                    string label = $"{auditionHistory.Count - h}. {histItem.soundName} ({histItem.waveType})";
+                    if (histItem.layers != null && histItem.layers.Count > 0)
+                    {
+                        label += $" [{histItem.layers.Count + 1} capas]";
+                    }
+                    if (histItem.lfoTarget != LfoTarget.None)
+                    {
+                        label += " +LFO";
+                    }
+
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button(label, EditorStyles.miniButtonLeft, GUILayout.Height(20)))
+                    {
+                        currentParams = histItem.Clone();
+                        activeLayerIndex = -1; // Reset selection to base
+                        UpdateJsonTextArea();
+
+                        // Play immediately
+                        float[] buffer = SynthEngine.Synthesize(currentParams);
+                        PlayPreview(buffer, currentParams.sampleRate);
+                    }
+                    if (GUILayout.Button("🗑️", GUILayout.Width(25), GUILayout.Height(20)))
+                    {
+                        auditionHistory.RemoveAt(h);
+                    }
+                    GUILayout.EndHorizontal();
+                }
+
+                if (GUILayout.Button("🧹 Borrar Historial", EditorStyles.miniButton, GUILayout.Height(20)))
+                {
+                    auditionHistory.Clear();
+                }
+                EditorGUILayout.EndVertical();
+                GUILayout.Space(10);
+            }
 
             // Export format options
             EditorGUILayout.BeginVertical(sectionStyle);
@@ -406,7 +584,6 @@ namespace RetroSoundSynthesizer.Editor
 
             // Interactive Draggable Splitter Handle Bar
             Rect splitterRect = GUILayoutUtility.GetRect(10, 8, GUILayout.ExpandWidth(true));
-            // Draw a subtle line for visual drag guide
             GUI.Box(new Rect(splitterRect.x, splitterRect.y + 3, splitterRect.width, 2), "");
             EditorGUIUtility.AddCursorRect(splitterRect, MouseCursor.ResizeVertical);
 
@@ -485,6 +662,7 @@ namespace RetroSoundSynthesizer.Editor
 
         private void PlayCurrentAudio()
         {
+            AddToAuditionHistory(currentParams);
             float[] buffer = SynthEngine.Synthesize(currentParams);
             PlayPreview(buffer, currentParams.sampleRate);
         }
@@ -608,6 +786,7 @@ namespace RetroSoundSynthesizer.Editor
                     // Load first element into sliders
                     currentParams = currentPack.sounds[0].Clone();
                     jsonClipboardText = json;
+                    activeLayerIndex = -1; // Reset active layer selection
                     Debug.Log($"[ProceduralAudioEditor] Decoded SoundPack with {currentPack.sounds.Count} sounds.");
                     Repaint();
                     return;
@@ -628,6 +807,7 @@ namespace RetroSoundSynthesizer.Editor
                     isSoundPackLoaded = false;
                     currentPack = new SoundPack();
                     jsonClipboardText = json;
+                    activeLayerIndex = -1; // Reset active layer selection
                     Debug.Log("[ProceduralAudioEditor] Decoded single sound settings.");
                     Repaint();
                 }
@@ -654,143 +834,146 @@ namespace RetroSoundSynthesizer.Editor
         {
             if (cornerLaser == null) InitializePadCorners();
 
+            SoundParameters target = GetActiveEditingParams();
+            if (target == null) return;
+
             // Bilinear interpolation formula:
             // P(x, y) = Lerp(Lerp(TL, TR, x), Lerp(BL, BR, x), y)
             // where TL = Laser, TR = Coin, BL = Explosion, BR = Jump
 
-            currentParams.waveType = (WaveType)Mathf.RoundToInt(Mathf.Lerp(
+            target.waveType = (WaveType)Mathf.RoundToInt(Mathf.Lerp(
                 Mathf.Lerp((float)cornerLaser.waveType, (float)cornerCoin.waveType, x),
                 Mathf.Lerp((float)cornerExplosion.waveType, (float)cornerJump.waveType, x),
                 y
             ));
 
-            currentParams.attackTime = Mathf.Lerp(
+            target.attackTime = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.attackTime, cornerCoin.attackTime, x),
                 Mathf.Lerp(cornerExplosion.attackTime, cornerJump.attackTime, x),
                 y
             );
 
-            currentParams.sustainTime = Mathf.Lerp(
+            target.sustainTime = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.sustainTime, cornerCoin.sustainTime, x),
                 Mathf.Lerp(cornerExplosion.sustainTime, cornerJump.sustainTime, x),
                 y
             );
 
-            currentParams.sustainPunch = Mathf.Lerp(
+            target.sustainPunch = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.sustainPunch, cornerCoin.sustainPunch, x),
                 Mathf.Lerp(cornerExplosion.sustainPunch, cornerJump.sustainPunch, x),
                 y
             );
 
-            currentParams.decayTime = Mathf.Lerp(
+            target.decayTime = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.decayTime, cornerCoin.decayTime, x),
                 Mathf.Lerp(cornerExplosion.decayTime, cornerJump.decayTime, x),
                 y
             );
 
-            currentParams.startFrequency = Mathf.Lerp(
+            target.startFrequency = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.startFrequency, cornerCoin.startFrequency, x),
                 Mathf.Lerp(cornerExplosion.startFrequency, cornerJump.startFrequency, x),
                 y
             );
 
-            currentParams.minFrequencyCutoff = Mathf.Lerp(
+            target.minFrequencyCutoff = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.minFrequencyCutoff, cornerCoin.minFrequencyCutoff, x),
                 Mathf.Lerp(cornerExplosion.minFrequencyCutoff, cornerJump.minFrequencyCutoff, x),
                 y
             );
 
-            currentParams.slide = Mathf.Lerp(
+            target.slide = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.slide, cornerCoin.slide, x),
                 Mathf.Lerp(cornerExplosion.slide, cornerJump.slide, x),
                 y
             );
 
-            currentParams.deltaSlide = Mathf.Lerp(
+            target.deltaSlide = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.deltaSlide, cornerCoin.deltaSlide, x),
                 Mathf.Lerp(cornerExplosion.deltaSlide, cornerJump.deltaSlide, x),
                 y
             );
 
-            currentParams.depth = Mathf.Lerp(
+            target.depth = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.depth, cornerCoin.depth, x),
                 Mathf.Lerp(cornerExplosion.depth, cornerJump.depth, x),
                 y
             );
 
-            currentParams.speed = Mathf.Lerp(
+            target.speed = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.speed, cornerCoin.speed, x),
                 Mathf.Lerp(cornerExplosion.speed, cornerJump.speed, x),
                 y
             );
 
-            currentParams.frequencyMult = Mathf.Lerp(
+            target.frequencyMult = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.frequencyMult, cornerCoin.frequencyMult, x),
                 Mathf.Lerp(cornerExplosion.frequencyMult, cornerJump.frequencyMult, x),
                 y
             );
 
-            currentParams.changeSpeed = Mathf.Lerp(
+            target.changeSpeed = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.changeSpeed, cornerCoin.changeSpeed, x),
                 Mathf.Lerp(cornerExplosion.changeSpeed, cornerJump.changeSpeed, x),
                 y
             );
 
-            currentParams.dutyCycle = Mathf.Lerp(
+            target.dutyCycle = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.dutyCycle, cornerCoin.dutyCycle, x),
                 Mathf.Lerp(cornerExplosion.dutyCycle, cornerJump.dutyCycle, x),
                 y
             );
 
-            currentParams.dutySweep = Mathf.Lerp(
+            target.dutySweep = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.dutySweep, cornerCoin.dutySweep, x),
                 Mathf.Lerp(cornerExplosion.dutySweep, cornerJump.dutySweep, x),
                 y
             );
 
-            currentParams.rate = Mathf.Lerp(
+            target.rate = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.rate, cornerCoin.rate, x),
                 Mathf.Lerp(cornerExplosion.rate, cornerJump.rate, x),
                 y
             );
 
-            currentParams.offset = Mathf.Lerp(
+            target.offset = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.offset, cornerCoin.offset, x),
                 Mathf.Lerp(cornerExplosion.offset, cornerJump.offset, x),
                 y
             );
 
-            currentParams.flangerSweep = Mathf.Lerp(
+            target.flangerSweep = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.flangerSweep, cornerCoin.flangerSweep, x),
                 Mathf.Lerp(cornerExplosion.flangerSweep, cornerJump.flangerSweep, x),
                 y
             );
 
-            currentParams.lpCutoffFrequency = Mathf.Lerp(
+            target.lpCutoffFrequency = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.lpCutoffFrequency, cornerCoin.lpCutoffFrequency, x),
                 Mathf.Lerp(cornerExplosion.lpCutoffFrequency, cornerJump.lpCutoffFrequency, x),
                 y
             );
 
-            currentParams.lpCutoffSweep = Mathf.Lerp(
+            target.lpCutoffSweep = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.lpCutoffSweep, cornerCoin.lpCutoffSweep, x),
                 Mathf.Lerp(cornerExplosion.lpCutoffSweep, cornerJump.lpCutoffSweep, x),
                 y
             );
 
-            currentParams.resonance = Mathf.Lerp(
+            target.resonance = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.resonance, cornerCoin.resonance, x),
                 Mathf.Lerp(cornerExplosion.resonance, cornerJump.resonance, x),
                 y
             );
 
-            currentParams.hpCutoffFrequency = Mathf.Lerp(
+            target.hpCutoffFrequency = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.hpCutoffFrequency, cornerCoin.hpCutoffFrequency, x),
                 Mathf.Lerp(cornerExplosion.hpCutoffFrequency, cornerJump.hpCutoffFrequency, x),
                 y
             );
 
-            currentParams.hpCutoffSweep = Mathf.Lerp(
+            target.hpCutoffSweep = Mathf.Lerp(
                 Mathf.Lerp(cornerLaser.hpCutoffSweep, cornerCoin.hpCutoffSweep, x),
                 Mathf.Lerp(cornerExplosion.hpCutoffSweep, cornerJump.hpCutoffSweep, x),
                 y

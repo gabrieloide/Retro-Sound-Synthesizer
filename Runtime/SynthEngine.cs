@@ -9,10 +9,71 @@ namespace RetroSoundSynthesizer.Runtime
 
         /// <summary>
         /// Mathematically synthesizes sound parameters into a raw float audio buffer.
-        /// The buffer is generated at 44100 Hz mono and normalized between -1.0 and 1.0.
+        /// Integrates recursive multi-layer mixing and advanced LFO modulation.
         /// </summary>
         public static float[] Synthesize(SoundParameters p)
         {
+            // --- LAYER MIXING & SUMMING ---
+            if (p.layers != null && p.layers.Count > 0)
+            {
+                // Force base parameters clone to avoid recursive infinity
+                SoundParameters baseParams = p.Clone();
+                baseParams.layers.Clear(); // Keep it single-layered
+                float[] baseBuffer = Synthesize(baseParams);
+
+                int maxSamples = baseBuffer.Length;
+                float[][] layerBuffers = new float[p.layers.Count][];
+
+                for (int i = 0; i < p.layers.Count; i++)
+                {
+                    var layer = p.layers[i];
+                    // Force the layer to synthesize at the same sample rate for consistency
+                    layer.sampleRate = p.sampleRate;
+                    layerBuffers[i] = Synthesize(layer);
+
+                    int delaySamples = (int)(layer.delay * (float)p.sampleRate);
+                    int totalLength = layerBuffers[i].Length + delaySamples;
+                    if (totalLength > maxSamples)
+                    {
+                        maxSamples = totalLength;
+                    }
+                }
+
+                float[] mixedBuffer = new float[maxSamples];
+
+                // Add base layer buffer
+                for (int s = 0; s < baseBuffer.Length; s++)
+                {
+                    mixedBuffer[s] += baseBuffer[s];
+                }
+
+                // Add each layer buffer with its delay offset
+                for (int i = 0; i < p.layers.Count; i++)
+                {
+                    var layer = p.layers[i];
+                    float[] lBuf = layerBuffers[i];
+                    int delaySamples = (int)(layer.delay * (float)p.sampleRate);
+
+                    for (int s = 0; s < lBuf.Length; s++)
+                    {
+                        int targetIdx = s + delaySamples;
+                        if (targetIdx < mixedBuffer.Length)
+                        {
+                            mixedBuffer[targetIdx] += lBuf[s];
+                        }
+                    }
+                }
+
+                // Hard clip the final mixed buffer between [-1.0f, 1.0f]
+                for (int s = 0; s < mixedBuffer.Length; s++)
+                {
+                    if (mixedBuffer[s] < -1.0f) mixedBuffer[s] = -1.0f;
+                    else if (mixedBuffer[s] > 1.0f) mixedBuffer[s] = 1.0f;
+                }
+
+                return mixedBuffer;
+            }
+
             // Seeded RNG for noise generation so synthesis remains deterministic if parameters don't change
             System.Random rand = new System.Random(1337);
 
@@ -87,6 +148,11 @@ namespace RetroSoundSynthesizer.Runtime
             float vibratoPhase = 0.0f;
             float vibratoSpeed = p.speed * p.speed * 0.01f;
             float vibratoAmplitude = p.depth * 0.5f;
+
+            // LFO modulation trackers
+            float lfoPhase = 0.0f;
+            float lfoSpeed = p.lfoSpeed * p.lfoSpeed * 0.005f; // slower speed factor for audible musical modulation
+            float lfoDepth = p.lfoDepth;
 
             // Envelope
             float envelopeVolume = 0.0f;
@@ -171,6 +237,29 @@ namespace RetroSoundSynthesizer.Runtime
                     }
                 }
 
+                // Calculate LFO value if active
+                float lfoValue = 0.0f;
+                if (p.lfoTarget != LfoTarget.None && lfoDepth > 0.0f)
+                {
+                    lfoPhase += lfoSpeed;
+                    float phaseNorm = lfoPhase % 6.2831853f;
+                    switch (p.lfoWaveform)
+                    {
+                        case LfoWaveform.Sine:
+                            lfoValue = Mathf.Sin(phaseNorm);
+                            break;
+                        case LfoWaveform.Triangle:
+                            lfoValue = Mathf.Abs(phaseNorm / 3.1415926f - 1.0f) * 2.0f - 1.0f;
+                            break;
+                        case LfoWaveform.Square:
+                            lfoValue = phaseNorm < 3.1415926f ? 1.0f : -1.0f;
+                            break;
+                        case LfoWaveform.Sawtooth:
+                            lfoValue = phaseNorm / 3.1415926f - 1.0f;
+                            break;
+                    }
+                }
+
                 float periodTemp = period;
 
                 // Apply vibrato
@@ -178,6 +267,12 @@ namespace RetroSoundSynthesizer.Runtime
                 {
                     vibratoPhase += vibratoSpeed;
                     periodTemp = period * (1.0f + Mathf.Sin(vibratoPhase) * vibratoAmplitude);
+                }
+
+                // Apply LFO Pitch modulation
+                if (p.lfoTarget == LfoTarget.Pitch && lfoDepth > 0.0f)
+                {
+                    periodTemp *= (1.0f + lfoValue * lfoDepth * 0.5f);
                 }
 
                 int periodTempInt = (int)periodTemp;
@@ -189,6 +284,13 @@ namespace RetroSoundSynthesizer.Runtime
                     squareDuty += dutySweep;
                     if (squareDuty < 0.0f) squareDuty = 0.0f;
                     else if (squareDuty > 0.5f) squareDuty = 0.5f;
+                }
+
+                // Apply LFO DutyCycle modulation
+                float activeDuty = squareDuty;
+                if (p.lfoTarget == LfoTarget.DutyCycle && lfoDepth > 0.0f)
+                {
+                    activeDuty = Mathf.Clamp(squareDuty + lfoValue * lfoDepth * 0.4f, 0.0f, 0.5f);
                 }
 
                 // Envelope stage transitions
@@ -217,6 +319,13 @@ namespace RetroSoundSynthesizer.Runtime
                         envelopeVolume = 0.0f;
                         finished = true;
                         break;
+                }
+
+                // Apply LFO Volume modulation
+                float activeEnvelopeVolume = envelopeVolume;
+                if (p.lfoTarget == LfoTarget.Volume && lfoDepth > 0.0f)
+                {
+                    activeEnvelopeVolume = Mathf.Clamp01(envelopeVolume * (1.0f - (lfoValue + 1.0f) * 0.5f * lfoDepth * 0.8f));
                 }
 
                 // Phaser / Flanger sweep
@@ -256,7 +365,7 @@ namespace RetroSoundSynthesizer.Runtime
                         switch (p.waveType)
                         {
                             case WaveType.Square:
-                                sample = ((tempPhase / periodTemp) < squareDuty) ? 0.5f : -0.5f;
+                                sample = ((tempPhase / periodTemp) < activeDuty) ? 0.5f : -0.5f;
                                 break;
                             case WaveType.Sawtooth:
                                 sample = 1.0f - (tempPhase / periodTemp) * 2.0f;
@@ -281,9 +390,16 @@ namespace RetroSoundSynthesizer.Runtime
                             if (lpFilterCutoff < 0.0f) lpFilterCutoff = 0.0f;
                             else if (lpFilterCutoff > 0.1f) lpFilterCutoff = 0.1f;
 
+                            // Apply LFO Cutoff modulation
+                            float sweptLpCutoff = lpFilterCutoff;
+                            if (p.lfoTarget == LfoTarget.Cutoff && lfoDepth > 0.0f)
+                            {
+                                sweptLpCutoff = Mathf.Clamp(lpFilterCutoff * (1.0f + lfoValue * lfoDepth * 0.8f), 0.0f, 0.1f);
+                            }
+
                             if (lpFilterOn)
                             {
-                                lpFilterDeltaPos += (sample - lpFilterPos) * lpFilterCutoff;
+                                lpFilterDeltaPos += (sample - lpFilterPos) * sweptLpCutoff;
                                 lpFilterDeltaPos *= lpFilterDamping;
                             }
                             else
@@ -307,7 +423,7 @@ namespace RetroSoundSynthesizer.Runtime
                     }
 
                     // Average and scale
-                    float finalSample = masterVolume * envelopeVolume * superSample * 0.125f;
+                    float finalSample = masterVolume * activeEnvelopeVolume * superSample * 0.125f;
 
                     // Hard clip
                     if (finalSample < -1.0f) finalSample = -1.0f;
@@ -346,7 +462,7 @@ namespace RetroSoundSynthesizer.Runtime
                         switch (p.waveType)
                         {
                             case WaveType.Square:
-                                sample = ((tempPhase / periodTemp) < squareDuty) ? 0.5f : -0.5f;
+                                sample = ((tempPhase / periodTemp) < activeDuty) ? 0.5f : -0.5f;
                                 break;
                             case WaveType.Sawtooth:
                                 sample = 1.0f - (tempPhase / periodTemp) * 2.0f;
@@ -371,9 +487,16 @@ namespace RetroSoundSynthesizer.Runtime
                             if (lpFilterCutoff < 0.0f) lpFilterCutoff = 0.0f;
                             else if (lpFilterCutoff > 0.1f) lpFilterCutoff = 0.1f;
 
+                            // Apply LFO Cutoff modulation
+                            float sweptLpCutoff = lpFilterCutoff;
+                            if (p.lfoTarget == LfoTarget.Cutoff && lfoDepth > 0.0f)
+                            {
+                                sweptLpCutoff = Mathf.Clamp(lpFilterCutoff * (1.0f + lfoValue * lfoDepth * 0.8f), 0.0f, 0.1f);
+                            }
+
                             if (lpFilterOn)
                             {
-                                lpFilterDeltaPos += (sample - lpFilterPos) * lpFilterCutoff;
+                                lpFilterDeltaPos += (sample - lpFilterPos) * sweptLpCutoff;
                                 lpFilterDeltaPos *= lpFilterDamping;
                             }
                             else
@@ -392,7 +515,7 @@ namespace RetroSoundSynthesizer.Runtime
                     }
 
                     // Average and scale
-                    float finalSample = masterVolume * envelopeVolume * superSample * 0.125f;
+                    float finalSample = masterVolume * activeEnvelopeVolume * superSample * 0.125f;
 
                     // Hard clip
                     if (finalSample < -1.0f) finalSample = -1.0f;
@@ -445,6 +568,14 @@ namespace RetroSoundSynthesizer.Runtime
 
             p.hpCutoffFrequency = 0.0f;
             p.hpCutoffSweep = 0.0f;
+
+            // Reset LFO and Layers
+            p.lfoTarget = LfoTarget.None;
+            p.lfoWaveform = LfoWaveform.Sine;
+            p.lfoSpeed = 0.0f;
+            p.lfoDepth = 0.0f;
+            p.delay = 0.0f;
+            p.layers.Clear();
 
             switch (presetName.ToLower())
             {
@@ -558,6 +689,7 @@ namespace RetroSoundSynthesizer.Runtime
 
         /// <summary>
         /// Subtly mutates the current sound parameters of p.
+        /// Handles LFO parameter mutation.
         /// </summary>
         public static void Mutate(SoundParameters p, float amount = 0.05f)
         {
@@ -587,6 +719,13 @@ namespace RetroSoundSynthesizer.Runtime
             if (GetRandomBool()) p.rate = Mathf.Clamp01(p.rate + GetMutVal());
             if (GetRandomBool()) p.changeSpeed = Mathf.Clamp01(p.changeSpeed + GetMutVal());
             if (GetRandomBool()) p.frequencyMult = Mathf.Clamp(p.frequencyMult + GetMutVal(), -1f, 1f);
+
+            // Mutate LFO if active
+            if (p.lfoTarget != LfoTarget.None && GetRandomBool())
+            {
+                p.lfoSpeed = Mathf.Clamp01(p.lfoSpeed + GetMutVal());
+                p.lfoDepth = Mathf.Clamp01(p.lfoDepth + GetMutVal());
+            }
         }
     }
 }

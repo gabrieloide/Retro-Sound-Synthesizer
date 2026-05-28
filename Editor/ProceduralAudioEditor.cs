@@ -450,62 +450,65 @@ namespace RetroSoundSynthesizer.Editor
         {
             StopPreview();
 
-            // Set hideFlags to prevent leak and store in member variable to prevent garbage collection
-            previewClip = AudioClip.Create("SynthPreview", samples.Length, 1, (int)rateOption, false);
-            previewClip.hideFlags = HideFlags.HideAndDontSave;
-            previewClip.SetData(samples, 0);
+            // 1. Export the procedural samples to a temporary WAV asset
+            string tempWavPath = WavExporter.ExportToWav(samples, rateOption, SampleSizeOption.Bit16, "~temp_preview");
+            if (string.IsNullOrEmpty(tempWavPath)) return;
 
-            Type audioUtilClass = typeof(UnityEditor.AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
-            if (audioUtilClass != null)
+            // 2. Load the imported AudioClip asset (forcing an import refresh if needed)
+            AssetDatabase.ImportAsset(tempWavPath);
+            AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>(tempWavPath);
+
+            if (clip != null)
             {
-                // Try finding PlayPreviewClip first, fallback to PlayClip with parameter matching
-                System.Reflection.MethodInfo playMethod = audioUtilClass.GetMethod("PlayPreviewClip",
-                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public,
-                    null, new Type[] { typeof(AudioClip), typeof(int), typeof(bool) }, null);
+                previewClip = clip;
 
-                if (playMethod == null)
+                Type audioUtilClass = typeof(UnityEditor.AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
+                if (audioUtilClass != null)
                 {
-                    playMethod = audioUtilClass.GetMethod("PlayClip",
+                    System.Reflection.MethodInfo playMethod = audioUtilClass.GetMethod("PlayPreviewClip",
                         System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public,
                         null, new Type[] { typeof(AudioClip), typeof(int), typeof(bool) }, null);
-                }
 
-                if (playMethod == null)
-                {
-                    playMethod = audioUtilClass.GetMethod("PlayPreviewClip",
-                        System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                }
+                    if (playMethod == null)
+                    {
+                        playMethod = audioUtilClass.GetMethod("PlayClip",
+                            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public,
+                            null, new Type[] { typeof(AudioClip), typeof(int), typeof(bool) }, null);
+                    }
 
-                if (playMethod == null)
-                {
-                    playMethod = audioUtilClass.GetMethod("PlayClip",
-                        System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                }
+                    if (playMethod == null)
+                    {
+                        playMethod = audioUtilClass.GetMethod("PlayPreviewClip",
+                            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                    }
 
-                if (playMethod != null)
-                {
-                    var parameters = playMethod.GetParameters();
-                    if (parameters.Length == 3)
+                    if (playMethod == null)
                     {
-                        playMethod.Invoke(null, new object[] { previewClip, 0, false });
+                        playMethod = audioUtilClass.GetMethod("PlayClip",
+                            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
                     }
-                    else if (parameters.Length == 1)
+
+                    if (playMethod != null)
                     {
-                        playMethod.Invoke(null, new object[] { previewClip });
+                        var parameters = playMethod.GetParameters();
+                        if (parameters.Length == 3)
+                        {
+                            playMethod.Invoke(null, new object[] { previewClip, 0, false });
+                        }
+                        else if (parameters.Length == 1)
+                        {
+                            playMethod.Invoke(null, new object[] { previewClip });
+                        }
+                        else if (parameters.Length == 2)
+                        {
+                            playMethod.Invoke(null, new object[] { previewClip, 0 });
+                        }
                     }
-                    else if (parameters.Length == 2)
-                    {
-                        playMethod.Invoke(null, new object[] { previewClip, 0 });
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning("[ProceduralAudioEditor] Could not find editor audio play method in AudioUtil.");
                 }
             }
             else
             {
-                Debug.LogWarning("[ProceduralAudioEditor] AudioUtil class not found in UnityEditor.");
+                Debug.LogWarning("[ProceduralAudioEditor] Temporary preview AudioClip could not be loaded.");
             }
         }
 
@@ -528,10 +531,18 @@ namespace RetroSoundSynthesizer.Editor
                 }
             }
 
-            if (previewClip != null)
+            previewClip = null;
+        }
+
+        private void OnDisable()
+        {
+            StopPreview();
+            
+            // Delete temporary preview file on disable/close to keep project assets clean
+            string tempWavPath = "Assets/~temp_preview.wav";
+            if (File.Exists(Path.Combine(Application.dataPath, "~temp_preview.wav")))
             {
-                DestroyImmediate(previewClip);
-                previewClip = null;
+                AssetDatabase.DeleteAsset(tempWavPath);
             }
         }
 

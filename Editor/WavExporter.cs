@@ -152,8 +152,22 @@ namespace RetroSoundSynthesizer.Editor
                     Directory.CreateDirectory(absoluteFolderPath);
                 }
 
-                string relativePath = Path.Combine(folder, $"{sanitizedName}.wav").Replace('\\', '/');
-                string absolutePath = Path.Combine(absoluteFolderPath, $"{sanitizedName}.wav");
+                string finalName = sanitizedName;
+                string absolutePath = Path.Combine(absoluteFolderPath, $"{finalName}.wav");
+
+                // Do not append numerical suffix for temporary audition previews
+                if (sanitizedName != "~temp_preview" && File.Exists(absolutePath))
+                {
+                    int counter = 1;
+                    while (File.Exists(Path.Combine(absoluteFolderPath, $"{sanitizedName}_{counter}.wav")))
+                    {
+                        counter++;
+                    }
+                    finalName = $"{sanitizedName}_{counter}";
+                    absolutePath = Path.Combine(absoluteFolderPath, $"{finalName}.wav");
+                }
+
+                string relativePath = Path.Combine(folder, $"{finalName}.wav").Replace('\\', '/');
 
                 File.WriteAllBytes(absolutePath, fullFile);
                 AssetDatabase.Refresh();

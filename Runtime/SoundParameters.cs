@@ -111,7 +111,65 @@ namespace RetroSoundSynthesizer.Runtime
                 masterGain = this.masterGain
             };
         }
+
+        public void Randomize()
+        {
+            System.Random rand = new System.Random();
+            Func<float> GetRandom = () => (float)rand.NextDouble();
+            Func<bool> GetRandomBool = () => rand.Next(0, 2) == 1;
+
+            waveType = (WaveType)rand.Next(0, 4);
+
+            attackTime = Mathf.Pow(GetRandom() * 2f - 1f, 4);
+            sustainTime = Mathf.Pow(GetRandom() * 2f - 1f, 2);
+            sustainPunch = Mathf.Pow(GetRandom() * 0.8f, 2);
+            decayTime = GetRandom();
+
+            startFrequency = (GetRandomBool()) ? Mathf.Pow(GetRandom() * 2f - 1f, 2) : (Mathf.Pow(GetRandom() * 0.5f, 3) + 0.5f);
+            minFrequencyCutoff = 0.0f;
+
+            slide = Mathf.Pow(GetRandom() * 2f - 1f, 3);
+            deltaSlide = Mathf.Pow(GetRandom() * 2f - 1f, 3);
+
+            depth = Mathf.Pow(GetRandom() * 2f - 1f, 3);
+            speed = GetRandom() * 2f - 1f;
+
+            frequencyMult = GetRandom() * 2f - 1f;
+            changeSpeed = GetRandom() * 2f - 1f;
+
+            dutyCycle = GetRandom() * 2f - 1f;
+            dutySweep = Mathf.Pow(GetRandom() * 2f - 1f, 3);
+
+            rate = GetRandom() * 2f - 1f;
+
+            offset = Mathf.Pow(GetRandom() * 2f - 1f, 3);
+            flangerSweep = Mathf.Pow(GetRandom() * 2f - 1f, 3);
+
+            lpCutoffFrequency = 1f - Mathf.Pow(GetRandom(), 3);
+            lpCutoffSweep = Mathf.Pow(GetRandom() * 2f - 1f, 3);
+            resonance = GetRandom() * 2f - 1f;
+
+            hpCutoffFrequency = Mathf.Pow(GetRandom(), 5);
+            hpCutoffSweep = Mathf.Pow(GetRandom() * 2f - 1f, 5);
+
+            if (attackTime + sustainTime + decayTime < 0.2f)
+            {
+                sustainTime = 0.2f + GetRandom() * 0.3f;
+                decayTime = 0.2f + GetRandom() * 0.3f;
+            }
+
+            if ((startFrequency > 0.7f && slide > 0.2f) || (startFrequency < 0.2f && slide < -0.05f))
+            {
+                slide = -slide;
+            }
+
+            if (lpCutoffFrequency < 0.1f && lpCutoffSweep < -0.05f)
+            {
+                lpCutoffSweep = -lpCutoffSweep;
+            }
+        }
     }
+
 
     [Serializable]
     public class SoundPack

@@ -18,6 +18,7 @@ namespace RetroSoundSynthesizer.Editor
         private SoundParameters currentParams = new SoundParameters();
         private SoundPack currentPack = new SoundPack();
         private bool isSoundPackLoaded = false;
+        private AudioClip previewClip;
 
         // Editor layout variables
         private int controlMode = 0; // 0 = Sliders Manuales, 1 = Preset Pad / 2D Mixer
@@ -449,8 +450,10 @@ namespace RetroSoundSynthesizer.Editor
         {
             StopPreview();
 
-            AudioClip clip = AudioClip.Create("SynthPreview", samples.Length, 1, (int)rateOption, false);
-            clip.SetData(samples, 0);
+            // Set hideFlags to prevent leak and store in member variable to prevent garbage collection
+            previewClip = AudioClip.Create("SynthPreview", samples.Length, 1, (int)rateOption, false);
+            previewClip.hideFlags = HideFlags.HideAndDontSave;
+            previewClip.SetData(samples, 0);
 
             Type audioUtilClass = typeof(UnityEditor.AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
             if (audioUtilClass != null)
@@ -484,15 +487,15 @@ namespace RetroSoundSynthesizer.Editor
                     var parameters = playMethod.GetParameters();
                     if (parameters.Length == 3)
                     {
-                        playMethod.Invoke(null, new object[] { clip, 0, false });
+                        playMethod.Invoke(null, new object[] { previewClip, 0, false });
                     }
                     else if (parameters.Length == 1)
                     {
-                        playMethod.Invoke(null, new object[] { clip });
+                        playMethod.Invoke(null, new object[] { previewClip });
                     }
                     else if (parameters.Length == 2)
                     {
-                        playMethod.Invoke(null, new object[] { clip, 0 });
+                        playMethod.Invoke(null, new object[] { previewClip, 0 });
                     }
                 }
                 else
@@ -523,6 +526,12 @@ namespace RetroSoundSynthesizer.Editor
                 {
                     stopMethod.Invoke(null, null);
                 }
+            }
+
+            if (previewClip != null)
+            {
+                DestroyImmediate(previewClip);
+                previewClip = null;
             }
         }
 

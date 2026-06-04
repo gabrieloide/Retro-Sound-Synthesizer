@@ -47,35 +47,53 @@ To open the synthesizer editor, go to Tools -> Procedural Audio Synthesizer in t
 - WAV Exporter: Enter a custom asset name, choose the sample rate (8kHz, 11kHz, 22kHz, 44kHz), choose the bit resolution (8-bit or 16-bit), and click Export to save the physical WAV asset in your project.
 - JSON Serialization: Copy the clean JSON string to your clipboard for external use or paste a JSON configuration to deserialize it instantly.
 
-## JSON Data Model
+## JSON Data Model (Single Sound & Sound Pack)
 
-Layered sounds are structured in a flat, non-recursive format to prevent Unity serialization cycle issues. This structure is highly readable and perfect for AI generation:
+Layered sounds are structured in a flat, non-recursive format to prevent Unity serialization cycle issues. This structure is highly readable and perfect for AI generation. 
+
+For AI prompts, you can ask the AI to generate a **Sound Pack** (multiple sounds at once) using the following format:
 
 ```json
 {
-  "baseSound": {
-    "soundName": "sci_fi_laser",
-    "waveType": 0,
-    "attackTime": 0.0,
-    "sustainTime": 0.12,
-    "decayTime": 0.25,
-    "startFrequency": 0.65,
-    "slide": -0.32,
-    "lfoTarget": 1,
-    "lfoWaveform": 0,
-    "lfoSpeed": 0.45,
-    "lfoDepth": 0.5
-  },
-  "layers": [
+  "sounds": [
     {
-      "soundName": "sub_noise_impact",
-      "waveType": 3,
-      "attackTime": 0.0,
-      "sustainTime": 0.05,
-      "decayTime": 0.08,
-      "startFrequency": 0.2,
-      "delay": 0.0,
-      "masterGain": 0.35
+      "baseSound": {
+        "soundName": "sci_fi_laser",
+        "waveType": 0,
+        "attackTime": 0.0,
+        "sustainTime": 0.12,
+        "decayTime": 0.25,
+        "startFrequency": 0.65,
+        "slide": -0.32,
+        "lfoTarget": 1,
+        "lfoWaveform": 0,
+        "lfoSpeed": 0.45,
+        "lfoDepth": 0.5
+      },
+      "layers": [
+        {
+          "soundName": "sub_noise_impact",
+          "waveType": 3,
+          "attackTime": 0.0,
+          "sustainTime": 0.05,
+          "decayTime": 0.08,
+          "startFrequency": 0.2,
+          "delay": 0.0,
+          "masterGain": 0.35
+        }
+      ]
+    },
+    {
+      "baseSound": {
+        "soundName": "simple_coin_pickup",
+        "waveType": 2,
+        "attackTime": 0.0,
+        "sustainTime": 0.1,
+        "decayTime": 0.3,
+        "startFrequency": 0.5,
+        "slide": 0.2
+      },
+      "layers": []
     }
   ]
 }

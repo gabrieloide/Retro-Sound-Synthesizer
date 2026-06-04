@@ -1,6 +1,6 @@
 {
   "name": "com.gabrieloide.retro-sound-synthesizer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "Retro Sound Synthesizer",
   "description": "A local, offline, mathematical C# procedural audio synthesis tool based on the classic sfxr/jsfxr architecture.",
   "unity": "2021.3",

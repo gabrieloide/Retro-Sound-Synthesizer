@@ -22,7 +22,7 @@ An offline, local, procedural 8/16-bit sound synthesis package for Unity based o
 3. Click the '+' button in the top-left corner of the window.
 4. Select "Add package from git URL...".
 5. Enter the following URL and click Add:
-   `https://github.com/gabrieloide/Retro-Sound-Synthesizer.git?path=Assets/RetroSoundSynthesizer#main`
+   `https://github.com/gabrieloide/Retro-Sound-Synthesizer.git#upm`
 
 ### Manual Installation
 

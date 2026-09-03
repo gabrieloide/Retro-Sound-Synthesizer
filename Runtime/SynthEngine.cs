@@ -386,6 +386,10 @@ namespace RetroSoundSynthesizer.Runtime
                                 int noiseIdx = (int)(tempPhase * 32.0f / periodTempInt) % 32;
                                 sample = noiseBuffer[noiseIdx];
                                 break;
+                            case WaveType.Triangle:
+                                float normPhase = tempPhase / periodTemp;
+                                sample = Mathf.Abs(normPhase * 2.0f - 1.0f) * 2.0f - 1.0f;
+                                break;
                         }
 
                         // Apply Filters
@@ -430,6 +434,13 @@ namespace RetroSoundSynthesizer.Runtime
 
                     // Average and scale
                     float finalSample = masterVolume * activeEnvelopeVolume * superSample * 0.125f;
+
+                    // Apply Lo-Fi Bitcrusher DSP quantization if enabled (2 to 16 bits)
+                    if (p.bitCrush >= 2 && p.bitCrush <= 16)
+                    {
+                        float levels = Mathf.Pow(2f, p.bitCrush - 1);
+                        finalSample = Mathf.Round(finalSample * levels) / levels;
+                    }
 
                     // Hard clip
                     if (finalSample < -1.0f) finalSample = -1.0f;
@@ -483,6 +494,10 @@ namespace RetroSoundSynthesizer.Runtime
                                 int noiseIdx = (int)(tempPhase * 32.0f / periodTempInt) % 32;
                                 sample = noiseBuffer[noiseIdx];
                                 break;
+                            case WaveType.Triangle:
+                                float normPhase = tempPhase / periodTemp;
+                                sample = Mathf.Abs(normPhase * 2.0f - 1.0f) * 2.0f - 1.0f;
+                                break;
                         }
 
                         // Apply Filters
@@ -522,6 +537,13 @@ namespace RetroSoundSynthesizer.Runtime
 
                     // Average and scale
                     float finalSample = masterVolume * activeEnvelopeVolume * superSample * 0.125f;
+
+                    // Apply Lo-Fi Bitcrusher DSP quantization if enabled (2 to 16 bits)
+                    if (p.bitCrush >= 2 && p.bitCrush <= 16)
+                    {
+                        float levels = Mathf.Pow(2f, p.bitCrush - 1);
+                        finalSample = Mathf.Round(finalSample * levels) / levels;
+                    }
 
                     // Hard clip
                     if (finalSample < -1.0f) finalSample = -1.0f;
@@ -643,7 +665,6 @@ namespace RetroSoundSynthesizer.Runtime
                     break;
 
                 case "explosion":
-                case "explosión":
                     p.waveType = WaveType.Noise;
                     if (GetRandomBool())
                     {
@@ -688,6 +709,49 @@ namespace RetroSoundSynthesizer.Runtime
 
                     if (GetRandomBool()) p.hpCutoffFrequency = GetRandom() * 0.3f;
                     if (GetRandomBool()) p.lpCutoffFrequency = 1.0f - GetRandom() * 0.6f;
+                    break;
+
+                case "powerup":
+                    p.waveType = WaveType.Square;
+                    p.startFrequency = 0.2f + GetRandom() * 0.3f;
+                    p.slide = 0.2f + GetRandom() * 0.3f;
+                    p.sustainTime = 0.15f + GetRandom() * 0.2f;
+                    p.decayTime = 0.2f + GetRandom() * 0.3f;
+                    p.changeSpeed = 0.4f + GetRandom() * 0.2f;
+                    p.frequencyMult = -0.4f - GetRandom() * 0.3f;
+                    p.dutyCycle = 0.3f + GetRandom() * 0.3f;
+                    break;
+
+                case "hit":
+                case "hurt":
+                    p.waveType = (WaveType)rand.Next(0, 4);
+                    if (p.waveType == WaveType.Sine) p.waveType = WaveType.Noise;
+                    p.startFrequency = 0.2f + GetRandom() * 0.6f;
+                    p.slide = -0.3f - GetRandom() * 0.4f;
+                    p.sustainTime = GetRandom() * 0.1f;
+                    p.decayTime = 0.1f + GetRandom() * 0.2f;
+                    if (GetRandomBool()) p.hpCutoffFrequency = GetRandom() * 0.3f;
+                    break;
+
+                case "nes_bass":
+                case "bass":
+                    p.waveType = WaveType.Triangle;
+                    p.startFrequency = 0.15f + GetRandom() * 0.15f;
+                    p.slide = -0.02f;
+                    p.attackTime = 0.0f;
+                    p.sustainTime = 0.2f + GetRandom() * 0.2f;
+                    p.decayTime = 0.2f + GetRandom() * 0.3f;
+                    p.lpCutoffFrequency = 0.8f;
+                    break;
+
+                case "blaster":
+                    p.waveType = WaveType.Sawtooth;
+                    p.startFrequency = 0.5f + GetRandom() * 0.4f;
+                    p.slide = -0.4f - GetRandom() * 0.3f;
+                    p.sustainTime = 0.05f + GetRandom() * 0.1f;
+                    p.decayTime = 0.1f + GetRandom() * 0.2f;
+                    p.offset = 0.1f + GetRandom() * 0.3f;
+                    p.flangerSweep = -0.2f;
                     break;
             }
         }

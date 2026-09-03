@@ -101,7 +101,7 @@ namespace RetroSoundSynthesizer.Editor
             EditorGUILayout.BeginHorizontal();
 
             // =========================================================================
-            // COLUMNA IZQUIERDA (Panel Dinámico con Switch)
+            // COLUMNA IZQUIERDA (Panel Dinamico con Switch)
             // =========================================================================
             EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.65f));
             DrawLeftColumn();
@@ -151,13 +151,13 @@ namespace RetroSoundSynthesizer.Editor
         private void DrawLeftColumn()
         {
             GUILayout.Space(10);
-            GUILayout.Label("🎛️ CONTROLES DE SÍNTESIS", headerStyle);
+            GUILayout.Label("CONTROLES DE SINTESIS", headerStyle);
 
             // =========================================================================
-            // GESTIÓN Y SELECCIÓN DE CAPAS (LAYER MIXER)
+            // GESTION Y SELECCION DE CAPAS (LAYER MIXER)
             // =========================================================================
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🔀 Mezclador de Capas (Sound Layers)", EditorStyles.boldLabel);
+            GUILayout.Label("Mezclador de Capas (Sound Layers)", EditorStyles.boldLabel);
             
             if (currentSound.layers == null) currentSound.layers = new List<SoundParameters>();
             int totalLayers = currentSound.layers.Count;
@@ -175,7 +175,7 @@ namespace RetroSoundSynthesizer.Editor
             GUILayout.Space(5);
             GUILayout.BeginHorizontal();
             
-            if (GUILayout.Button("➕ Añadir Capa", GUILayout.Height(22)))
+            if (GUILayout.Button("Anadir Capa", GUILayout.Height(22)))
             {
                 // Clone base sound parameters to provide a beautiful starting point
                 SoundParameters newLayer = currentSound.baseSound.Clone();
@@ -191,7 +191,7 @@ namespace RetroSoundSynthesizer.Editor
             if (activeLayerIndex >= 0 && currentSound.layers != null && activeLayerIndex < currentSound.layers.Count)
             {
                 GUI.backgroundColor = new Color(0.9f, 0.3f, 0.3f);
-                if (GUILayout.Button("🗑️ Eliminar Capa", GUILayout.Height(22)))
+                if (GUILayout.Button("X Eliminar Capa", GUILayout.Height(22)))
                 {
                     currentSound.layers.RemoveAt(activeLayerIndex);
                     activeLayerIndex = activeLayerIndex - 1; // fallback to base or previous layer
@@ -208,7 +208,7 @@ namespace RetroSoundSynthesizer.Editor
                 GUILayout.Space(6);
                 var activeLayer = currentSound.layers[activeLayerIndex];
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-                GUILayout.Label($"Ajustes Específicos de Capa #{activeLayerIndex + 1}", EditorStyles.miniBoldLabel);
+                GUILayout.Label($"Ajustes Especificos de Capa #{activeLayerIndex + 1}", EditorStyles.miniBoldLabel);
                 activeLayer.delay = EditorGUILayout.Slider("Retardo (Delay en Seg)", activeLayer.delay, 0f, 4f);
                 activeLayer.masterGain = EditorGUILayout.Slider("Ganancia de Capa", activeLayer.masterGain, 0f, 1f);
                 EditorGUILayout.EndVertical();
@@ -216,14 +216,14 @@ namespace RetroSoundSynthesizer.Editor
             else
             {
                 GUILayout.Space(4);
-                GUILayout.Label("Editando los parámetros de la Capa Base. Se sumará con las capas añadidas.", EditorStyles.miniLabel);
+                GUILayout.Label("Editando los parametros de la Capa Base. Se sumara con las capas anadidas.", EditorStyles.miniLabel);
             }
 
             EditorGUILayout.EndVertical();
             GUILayout.Space(8);
 
             // Tab-Switch control for Synthesis Controls
-            string[] modes = { "🎚️ Sliders Manuales (sfxr)", "🎯 Preset Pad / Mezclador 2D" };
+            string[] modes = { "Sliders Manuales", "Preset Pad / Mezclador 2D" };
             int newMode = GUILayout.Toolbar(controlMode, modes, GUILayout.Height(30));
             if (newMode != controlMode)
             {
@@ -260,13 +260,13 @@ namespace RetroSoundSynthesizer.Editor
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("Waveform Type", EditorStyles.boldLabel);
             GUILayout.Space(4);
-            string[] waveNames = { "Square", "Sawtooth", "Sine", "Noise" };
-            target.waveType = (WaveType)GUILayout.SelectionGrid((int)target.waveType, waveNames, 4, selectionGridStyle);
+            string[] waveNames = { "Square", "Sawtooth", "Sine", "Noise", "Triangle" };
+            target.waveType = (WaveType)GUILayout.SelectionGrid((int)target.waveType, waveNames, 5, selectionGridStyle);
             EditorGUILayout.EndVertical();
 
             // Section: Envelope
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("📬 Envelope (ADSR)", EditorStyles.boldLabel);
+            GUILayout.Label("Envelope (ADSR)", EditorStyles.boldLabel);
             target.attackTime = EditorGUILayout.Slider("Attack Time", target.attackTime, 0f, 1f);
             target.sustainTime = EditorGUILayout.Slider("Sustain Time", target.sustainTime, 0f, 1f);
             target.sustainPunch = EditorGUILayout.Slider("Sustain Punch", target.sustainPunch, 0f, 1f);
@@ -275,7 +275,7 @@ namespace RetroSoundSynthesizer.Editor
 
             // Section: Frequency
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🎵 Frequency Modulation", EditorStyles.boldLabel);
+            GUILayout.Label("Frequency Modulation", EditorStyles.boldLabel);
             target.startFrequency = EditorGUILayout.Slider("Start Frequency", target.startFrequency, 0f, 1f);
             target.minFrequencyCutoff = EditorGUILayout.Slider("Min Cutoff Frequency", target.minFrequencyCutoff, 0f, 1f);
             target.slide = EditorGUILayout.Slider("Slide Speed", target.slide, -1f, 1f);
@@ -284,14 +284,14 @@ namespace RetroSoundSynthesizer.Editor
 
             // Section: Vibrato
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("💓 Vibrato Modulation", EditorStyles.boldLabel);
+            GUILayout.Label("Vibrato Modulation", EditorStyles.boldLabel);
             target.depth = EditorGUILayout.Slider("Vibrato Depth", target.depth, 0f, 1f);
             target.speed = EditorGUILayout.Slider("Vibrato Speed", target.speed, 0f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: Arpeggiation
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🛹 Arpeggiation / Jumps", EditorStyles.boldLabel);
+            GUILayout.Label("Arpeggiation / Jumps", EditorStyles.boldLabel);
             target.frequencyMult = EditorGUILayout.Slider("Pitch Jump Amount", target.frequencyMult, -1f, 1f);
             target.changeSpeed = EditorGUILayout.Slider("Pitch Jump Speed", target.changeSpeed, 0f, 1f);
             EditorGUILayout.EndVertical();
@@ -300,7 +300,7 @@ namespace RetroSoundSynthesizer.Editor
             if (target.waveType == WaveType.Square)
             {
                 EditorGUILayout.BeginVertical(sectionStyle);
-                GUILayout.Label("🔲 Square wave Duty Cycle", EditorStyles.boldLabel);
+                GUILayout.Label("Square Wave Duty Cycle", EditorStyles.boldLabel);
                 target.dutyCycle = EditorGUILayout.Slider("Duty Cycle", target.dutyCycle, 0f, 1f);
                 target.dutySweep = EditorGUILayout.Slider("Duty Sweep Speed", target.dutySweep, -1f, 1f);
                 EditorGUILayout.EndVertical();
@@ -308,20 +308,20 @@ namespace RetroSoundSynthesizer.Editor
 
             // Section: Retrigger
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🔁 Retrigger Speed", EditorStyles.boldLabel);
+            GUILayout.Label("Retrigger Speed", EditorStyles.boldLabel);
             target.rate = EditorGUILayout.Slider("Retrigger Rate", target.rate, 0f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: Flanger
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🌀 Flanger / Phaser Effect", EditorStyles.boldLabel);
+            GUILayout.Label("Flanger / Phaser Effect", EditorStyles.boldLabel);
             target.offset = EditorGUILayout.Slider("Flanger Offset", target.offset, -1f, 1f);
             target.flangerSweep = EditorGUILayout.Slider("Flanger Sweep Speed", target.flangerSweep, -1f, 1f);
             EditorGUILayout.EndVertical();
 
             // Section: Low-Pass Filter
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🟢 Low-Pass Filter", EditorStyles.boldLabel);
+            GUILayout.Label("Low-Pass Filter", EditorStyles.boldLabel);
             target.lpCutoffFrequency = EditorGUILayout.Slider("LP Cutoff Frequency", target.lpCutoffFrequency, 0f, 1f);
             target.lpCutoffSweep = EditorGUILayout.Slider("LP Cutoff Sweep", target.lpCutoffSweep, -1f, 1f);
             target.resonance = EditorGUILayout.Slider("LP Resonance", target.resonance, 0f, 1f);
@@ -329,14 +329,24 @@ namespace RetroSoundSynthesizer.Editor
 
             // Section: High-Pass Filter
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🔴 High-Pass Filter", EditorStyles.boldLabel);
+            GUILayout.Label("High-Pass Filter", EditorStyles.boldLabel);
             target.hpCutoffFrequency = EditorGUILayout.Slider("HP Cutoff Frequency", target.hpCutoffFrequency, 0f, 1f);
             target.hpCutoffSweep = EditorGUILayout.Slider("HP Cutoff Sweep", target.hpCutoffSweep, -1f, 1f);
             EditorGUILayout.EndVertical();
 
+            // Section: Lo-Fi Bitcrusher DSP
+            EditorGUILayout.BeginVertical(sectionStyle);
+            GUILayout.Label("Lo-Fi Bitcrusher (Retro Crunch)", EditorStyles.boldLabel);
+            target.bitCrush = EditorGUILayout.IntSlider("Bit Depth (0 = Clean)", target.bitCrush, 0, 16);
+            if (target.bitCrush >= 2)
+            {
+                EditorGUILayout.HelpBox($"Cuantizado a resolucion de {target.bitCrush} bits.", MessageType.None);
+            }
+            EditorGUILayout.EndVertical();
+
             // Section: LFO Modulation (Advanced LFO)
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🌀 Modulación LFO (Filtros, Tono y Volumen)", EditorStyles.boldLabel);
+            GUILayout.Label("Modulacion LFO (Filtros, Tono y Volumen)", EditorStyles.boldLabel);
             target.lfoTarget = (LfoTarget)EditorGUILayout.EnumPopup("LFO Destino (Target)", target.lfoTarget);
             if (target.lfoTarget != LfoTarget.None)
             {
@@ -353,7 +363,7 @@ namespace RetroSoundSynthesizer.Editor
             if (target == null) return;
 
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🎯 2D Bilinear Mixer Pad", EditorStyles.boldLabel);
+            GUILayout.Label("2D Bilinear Mixer Pad", EditorStyles.boldLabel);
             GUILayout.Label("Drag the cyan cursor to smoothly interpolate procedural parameters in real-time.", EditorStyles.miniLabel);
             GUILayout.Space(8);
 
@@ -376,10 +386,10 @@ namespace RetroSoundSynthesizer.Editor
             };
 
             // Corner labels
-            GUI.Label(new Rect(padRect.x + 5, padRect.y + 5, 80, 20), "🟢 LASER", cornerLabelStyle);
-            GUI.Label(new Rect(padRect.xMax - 85, padRect.y + 5, 80, 20), "🟡 COIN", cornerLabelStyle);
-            GUI.Label(new Rect(padRect.x + 5, padRect.yMax - 25, 80, 20), "🔴 EXPLOSION", cornerLabelStyle);
-            GUI.Label(new Rect(padRect.xMax - 85, padRect.yMax - 25, 80, 20), "🔵 JUMP", cornerLabelStyle);
+            GUI.Label(new Rect(padRect.x + 5, padRect.y + 5, 80, 20), "LASER", cornerLabelStyle);
+            GUI.Label(new Rect(padRect.xMax - 85, padRect.y + 5, 80, 20), "COIN", cornerLabelStyle);
+            GUI.Label(new Rect(padRect.x + 5, padRect.yMax - 25, 80, 20), "EXPLOSION", cornerLabelStyle);
+            GUI.Label(new Rect(padRect.xMax - 85, padRect.yMax - 25, 80, 20), "JUMP", cornerLabelStyle);
 
             // Draw center grid guide lines
             Handles.color = new Color(1, 1, 1, 0.15f);
@@ -427,10 +437,17 @@ namespace RetroSoundSynthesizer.Editor
             EditorGUILayout.BeginVertical(sectionStyle);
             GUILayout.Label("Instant Presets (Seeded)", EditorStyles.boldLabel);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("🔫 Laser")) GenerateFullPreset("laser");
-            if (GUILayout.Button("🪙 Coin")) GenerateFullPreset("coin");
-            if (GUILayout.Button("💥 Explosion")) GenerateFullPreset("explosion");
-            if (GUILayout.Button("🦘 Jump")) GenerateFullPreset("jump");
+            if (GUILayout.Button("Laser")) GenerateFullPreset("laser");
+            if (GUILayout.Button("Coin")) GenerateFullPreset("coin");
+            if (GUILayout.Button("Explosion")) GenerateFullPreset("explosion");
+            if (GUILayout.Button("Jump")) GenerateFullPreset("jump");
+            GUILayout.EndHorizontal();
+            GUILayout.Space(2);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Powerup")) GenerateFullPreset("powerup");
+            if (GUILayout.Button("Hit")) GenerateFullPreset("hit");
+            if (GUILayout.Button("NES Bass")) GenerateFullPreset("nes_bass");
+            if (GUILayout.Button("Blaster")) GenerateFullPreset("blaster");
             GUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
         }
@@ -467,20 +484,20 @@ namespace RetroSoundSynthesizer.Editor
         private void DrawRightColumn()
         {
             GUILayout.Space(10);
-            GUILayout.Label("💾 FORMATO Y EXPORTACIÓN", headerStyle);
+            GUILayout.Label("FORMATO Y EXPORTACION", headerStyle);
 
             SoundParameters target = GetActiveEditingParams();
 
             // Sound Name Field
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("🏷️ Sound Name", EditorStyles.boldLabel);
+            GUILayout.Label("Sound Name", EditorStyles.boldLabel);
             currentSound.baseSound.soundName = EditorGUILayout.TextField("", currentSound.baseSound.soundName);
             EditorGUILayout.EndVertical();
 
             // Big Preview Play Button
             Color originalColor = GUI.backgroundColor;
             GUI.backgroundColor = new Color(0.2f, 0.8f, 0.4f);
-            if (GUILayout.Button("▶️ PLAY PREVIEW", GUILayout.Height(50)))
+            if (GUILayout.Button("PLAY PREVIEW", GUILayout.Height(50)))
             {
                 PlayCurrentAudio();
             }
@@ -490,15 +507,28 @@ namespace RetroSoundSynthesizer.Editor
 
             // Preset local mutator buttons
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("🎲 Randomize Settings"))
+            if (GUILayout.Button("Randomize Settings"))
             {
                 target.Randomize();
                 UpdateJsonTextArea();
                 PlayCurrentAudio();
             }
-            if (GUILayout.Button("🧬 Mutate Local (Mutar)"))
+            if (GUILayout.Button("Mutate Local"))
             {
                 SynthEngine.Mutate(target, 0.06f);
+                UpdateJsonTextArea();
+                PlayCurrentAudio();
+            }
+            if (GUILayout.Button("Variation"))
+            {
+                if (activeLayerIndex >= 0 && currentSound.layers != null && activeLayerIndex < currentSound.layers.Count)
+                {
+                    currentSound.layers[activeLayerIndex] = currentSound.layers[activeLayerIndex].CreateVariation(0.1f);
+                }
+                else
+                {
+                    currentSound.baseSound = currentSound.baseSound.CreateVariation(0.1f);
+                }
                 UpdateJsonTextArea();
                 PlayCurrentAudio();
             }
@@ -510,7 +540,7 @@ namespace RetroSoundSynthesizer.Editor
             if (auditionHistory.Count > 0)
             {
                 EditorGUILayout.BeginVertical(sectionStyle);
-                GUILayout.Label("📜 Historial de Audición", EditorStyles.boldLabel);
+                GUILayout.Label("Historial de Audicion", EditorStyles.boldLabel);
                 GUILayout.Label("Haz click para restaurar un sonido previo:", EditorStyles.miniLabel);
                 GUILayout.Space(4);
 
@@ -538,14 +568,14 @@ namespace RetroSoundSynthesizer.Editor
                         float[] buffer = SynthEngine.Synthesize(currentSound);
                         PlayPreview(buffer, currentSound.baseSound.sampleRate);
                     }
-                    if (GUILayout.Button("🗑️", GUILayout.Width(25), GUILayout.Height(20)))
+                    if (GUILayout.Button("X", GUILayout.Width(25), GUILayout.Height(20)))
                     {
                         auditionHistory.RemoveAt(h);
                     }
                     GUILayout.EndHorizontal();
                 }
 
-                if (GUILayout.Button("🧹 Borrar Historial", EditorStyles.miniButton, GUILayout.Height(20)))
+                if (GUILayout.Button("Borrar Historial", EditorStyles.miniButton, GUILayout.Height(20)))
                 {
                     auditionHistory.Clear();
                 }
@@ -555,7 +585,7 @@ namespace RetroSoundSynthesizer.Editor
 
             // Export format options
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("⚙️ Output WAV Settings", EditorStyles.boldLabel);
+            GUILayout.Label("Output WAV Settings", EditorStyles.boldLabel);
             currentSound.baseSound.sampleRate = (SampleRateOption)EditorGUILayout.EnumPopup("Sample Rate", currentSound.baseSound.sampleRate);
             currentSound.baseSound.sampleSize = (SampleSizeOption)EditorGUILayout.EnumPopup("Sample Resolution", currentSound.baseSound.sampleSize);
             currentSound.baseSound.masterGain = EditorGUILayout.Slider("Master Gain", currentSound.baseSound.masterGain, 0f, 1f);
@@ -563,7 +593,7 @@ namespace RetroSoundSynthesizer.Editor
             GUILayout.Space(6);
             GUILayout.BeginHorizontal();
             exportFolder = EditorGUILayout.TextField("Export Folder", exportFolder);
-            if (GUILayout.Button("📁 Choose...", GUILayout.Width(75)))
+            if (GUILayout.Button("Choose...", GUILayout.Width(75)))
             {
                 string selectedPath = EditorUtility.OpenFolderPanel("Select Export Folder", "Assets", "");
                 if (!string.IsNullOrEmpty(selectedPath))
@@ -590,7 +620,7 @@ namespace RetroSoundSynthesizer.Editor
 
             GUILayout.Space(10);
 
-            if (GUILayout.Button("💾 EXPORT .WAV FILE", GUILayout.Height(35)))
+            if (GUILayout.Button("EXPORT .WAV FILE", GUILayout.Height(35)))
             {
                 float[] buffer = SynthEngine.Synthesize(currentSound);
                 string savedPath = WavExporter.ExportToWav(buffer, currentSound.baseSound.sampleRate, currentSound.baseSound.sampleSize, currentSound.baseSound.soundName, exportFolder);
@@ -607,9 +637,9 @@ namespace RetroSoundSynthesizer.Editor
             EditorGUILayout.BeginVertical(sectionStyle);
             
             GUILayout.BeginHorizontal();
-            GUILayout.Label("📋 JSON Serialization Data", EditorStyles.boldLabel);
+            GUILayout.Label("JSON Serialization Data", EditorStyles.boldLabel);
             GUILayout.FlexibleSpace();
-            GUILayout.Label("↕️ Height", EditorStyles.miniLabel);
+            GUILayout.Label("Height", EditorStyles.miniLabel);
             jsonTextAreaHeight = EditorGUILayout.Slider("", jsonTextAreaHeight, 80f, 450f, GUILayout.Width(130));
             GUILayout.EndHorizontal();
 
@@ -644,7 +674,7 @@ namespace RetroSoundSynthesizer.Editor
             }
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("🔗 Serialize (Copy JSON)"))
+            if (GUILayout.Button("Serialize (Copy JSON)"))
             {
                 if (isSoundPackLoaded && currentPack != null && currentPack.sounds != null && currentPack.sounds.Count > 0)
                 {
@@ -657,7 +687,7 @@ namespace RetroSoundSynthesizer.Editor
                 GUIUtility.systemCopyBuffer = jsonClipboardText;
                 Debug.Log("[ProceduralAudioEditor] Copied sound JSON configuration to clipboard.");
             }
-            if (GUILayout.Button("📥 Deserialize (Load JSON)"))
+            if (GUILayout.Button("Deserialize (Load JSON)"))
             {
                 DeserializeConfig(GUIUtility.systemCopyBuffer);
             }
@@ -670,7 +700,7 @@ namespace RetroSoundSynthesizer.Editor
             {
                 Color prevColor = GUI.backgroundColor;
                 GUI.backgroundColor = new Color(0.2f, 0.6f, 0.9f);
-                if (GUILayout.Button("📦 Export All in Batch (Lote)", GUILayout.Height(40)))
+                if (GUILayout.Button("Export All in Batch", GUILayout.Height(40)))
                 {
                     int successCount = 0;
                     for (int i = 0; i < currentPack.sounds.Count; i++)

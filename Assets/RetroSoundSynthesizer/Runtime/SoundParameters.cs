@@ -9,7 +9,8 @@ namespace RetroSoundSynthesizer.Runtime
         Square = 0,
         Sawtooth = 1,
         Sine = 2,
-        Noise = 3
+        Noise = 3,
+        Triangle = 4
     }
 
     public enum SampleRateOption
@@ -99,6 +100,9 @@ namespace RetroSoundSynthesizer.Runtime
         // Layer delay (used when this SoundParameters is mixed as a layer)
         [Range(0f, 5f)] public float delay = 0.0f;
 
+        // Lo-Fi Bitcrusher DSP (0 = clean 16-bit, 2 to 16 = quantized bit depth)
+        [Range(0, 16)] public int bitCrush = 0;
+
         // Output configuration
         public SampleRateOption sampleRate = SampleRateOption.Rate44k;
         public SampleSizeOption sampleSize = SampleSizeOption.Bit16;
@@ -137,10 +141,30 @@ namespace RetroSoundSynthesizer.Runtime
                 lfoSpeed = this.lfoSpeed,
                 lfoDepth = this.lfoDepth,
                 delay = this.delay,
+                bitCrush = this.bitCrush,
                 sampleRate = this.sampleRate,
                 sampleSize = this.sampleSize,
                 masterGain = this.masterGain
             };
+        }
+
+        /// <summary>
+        /// Creates a subtle procedural variation of the sound for runtime dynamic variation.
+        /// </summary>
+        public SoundParameters CreateVariation(float jitter = 0.1f)
+        {
+            SoundParameters v = this.Clone();
+            System.Random rand = new System.Random();
+            Func<float> R = () => (float)(rand.NextDouble() * 2.0 - 1.0) * jitter;
+
+            v.startFrequency = Mathf.Clamp(v.startFrequency * (1.0f + R() * 0.12f), 0.01f, 1.0f);
+            v.attackTime = Mathf.Clamp01(v.attackTime * (1.0f + R() * 0.15f));
+            v.decayTime = Mathf.Clamp(v.decayTime * (1.0f + R() * 0.15f), 0.05f, 1.0f);
+            if (v.lpCutoffFrequency < 1.0f)
+            {
+                v.lpCutoffFrequency = Mathf.Clamp01(v.lpCutoffFrequency * (1.0f + R() * 0.12f));
+            }
+            return v;
         }
 
         public void Randomize()
@@ -241,6 +265,28 @@ namespace RetroSoundSynthesizer.Runtime
             }
 
             return clone;
+        }
+
+        /// <summary>
+        /// Creates a subtle procedural variation across all layers for runtime audio variance.
+        /// </summary>
+        public CompositeSound CreateVariation(float jitter = 0.1f)
+        {
+            var variation = new CompositeSound
+            {
+                baseSound = this.baseSound.CreateVariation(jitter),
+                layers = new List<SoundParameters>()
+            };
+
+            if (this.layers != null)
+            {
+                foreach (var layer in this.layers)
+                {
+                    variation.layers.Add(layer.CreateVariation(jitter));
+                }
+            }
+
+            return variation;
         }
     }
 

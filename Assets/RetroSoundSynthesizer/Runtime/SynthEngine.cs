@@ -60,11 +60,21 @@ namespace RetroSoundSynthesizer.Runtime
                     }
                 }
 
-                // Hard clip the final mixed buffer between [-1.0f, 1.0f]
+                // Peak-preserving soft normalization to prevent harsh clipping distortion
+                float maxPeak = 0.0f;
                 for (int s = 0; s < mixedBuffer.Length; s++)
                 {
-                    if (mixedBuffer[s] < -1.0f) mixedBuffer[s] = -1.0f;
-                    else if (mixedBuffer[s] > 1.0f) mixedBuffer[s] = 1.0f;
+                    float abs = Mathf.Abs(mixedBuffer[s]);
+                    if (abs > maxPeak) maxPeak = abs;
+                }
+
+                if (maxPeak > 0.95f)
+                {
+                    float scaleFactor = 0.95f / maxPeak;
+                    for (int s = 0; s < mixedBuffer.Length; s++)
+                    {
+                        mixedBuffer[s] *= scaleFactor;
+                    }
                 }
 
                 return mixedBuffer;
@@ -188,15 +198,21 @@ namespace RetroSoundSynthesizer.Runtime
 
             // Phase tracking
             int phase = 0;
-            float masterVolume = p.masterGain * p.masterGain;
+            // Perceptual volume curve with punchy presence and ample headroom
+            float masterVolume = p.masterGain * (1.25f + 0.5f * p.masterGain);
 
             // Preallocate output buffer
             float[] buffer = new float[envelopeFullLength];
             bool finished = false;
+            int actualLength = (int)envelopeFullLength;
 
             for (int i = 0; i < envelopeFullLength; i++)
             {
-                if (finished) break;
+                if (finished)
+                {
+                    actualLength = i;
+                    break;
+                }
 
                 // Retrigger check
                 if (repeatLimit != 0)
@@ -371,7 +387,7 @@ namespace RetroSoundSynthesizer.Runtime
                         switch (p.waveType)
                         {
                             case WaveType.Square:
-                                sample = ((tempPhase / periodTemp) < activeDuty) ? 0.5f : -0.5f;
+                                sample = ((tempPhase / periodTemp) < activeDuty) ? 0.85f : -0.85f;
                                 break;
                             case WaveType.Sawtooth:
                                 sample = 1.0f - (tempPhase / periodTemp) * 2.0f;
@@ -479,7 +495,7 @@ namespace RetroSoundSynthesizer.Runtime
                         switch (p.waveType)
                         {
                             case WaveType.Square:
-                                sample = ((tempPhase / periodTemp) < activeDuty) ? 0.5f : -0.5f;
+                                sample = ((tempPhase / periodTemp) < activeDuty) ? 0.85f : -0.85f;
                                 break;
                             case WaveType.Sawtooth:
                                 sample = 1.0f - (tempPhase / periodTemp) * 2.0f;
@@ -553,7 +569,79 @@ namespace RetroSoundSynthesizer.Runtime
                 }
             }
 
+            if (actualLength < envelopeFullLength && actualLength > 0)
+            {
+                // Smooth anti-pop micro fade-out to eliminate sudden DC clicks on cutoffs
+                int fadeSamples = Mathf.Min(32, actualLength);
+                for (int f = 0; f < fadeSamples; f++)
+                {
+                    int idx = actualLength - 1 - f;
+                    float ramp = (float)f / fadeSamples;
+                    buffer[idx] *= ramp;
+                }
+
+                float[] trimmed = new float[actualLength];
+                Array.Copy(buffer, trimmed, actualLength);
+                buffer = trimmed;
+            }
+
             return buffer;
+        }
+
+        /// <summary>
+        /// Populates specific layer archetypes designed to enrich sounds (transients, sub-bass, sparkle, echoes).
+        /// </summary>
+        public static void GenerateLayerPreset(SoundParameters p, string layerType)
+        {
+            p.attackTime = 0.0f;
+            p.delay = 0.0f;
+            p.masterGain = 0.75f;
+            p.lfoTarget = LfoTarget.None;
+
+            switch (layerType.ToLower())
+            {
+                case "noise_impact":
+                case "ruido":
+                    p.soundName = "Layer_Noise";
+                    p.waveType = WaveType.Noise;
+                    p.startFrequency = 0.6f;
+                    p.sustainTime = 0.02f;
+                    p.decayTime = 0.08f;
+                    p.sustainPunch = 0.5f;
+                    p.hpCutoffFrequency = 0.15f;
+                    break;
+
+                case "sub_bass":
+                case "subgrave":
+                    p.soundName = "Layer_SubBass";
+                    p.waveType = WaveType.Triangle;
+                    p.startFrequency = 0.15f;
+                    p.slide = -0.05f;
+                    p.sustainTime = 0.18f;
+                    p.decayTime = 0.25f;
+                    p.lpCutoffFrequency = 0.6f;
+                    p.resonance = 0.3f;
+                    break;
+
+                case "sparkle":
+                case "brillo":
+                    p.soundName = "Layer_Sparkle";
+                    p.waveType = WaveType.Sine;
+                    p.startFrequency = 0.85f;
+                    p.slide = -0.1f;
+                    p.sustainTime = 0.05f;
+                    p.decayTime = 0.12f;
+                    p.masterGain = 0.65f;
+                    break;
+
+                case "retro_echo":
+                case "eco":
+                    p.soundName = "Layer_Echo";
+                    p.delay = 0.14f;
+                    p.masterGain = 0.55f;
+                    p.lpCutoffFrequency = 0.5f;
+                    break;
+            }
         }
 
         /// <summary>

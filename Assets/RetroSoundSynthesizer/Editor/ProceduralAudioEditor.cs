@@ -151,50 +151,49 @@ namespace RetroSoundSynthesizer.Editor
         private void DrawLeftColumn()
         {
             GUILayout.Space(10);
-            GUILayout.Label("CONTROLES DE SINTESIS", headerStyle);
+            GUILayout.Label("SYNTHESIS CONTROLS", headerStyle);
 
             // =========================================================================
-            // GESTION Y SELECCION DE CAPAS (LAYER MIXER)
+            // LAYER MIXER
             // =========================================================================
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("Mezclador de Capas (Sound Layers)", EditorStyles.boldLabel);
+            GUILayout.Label("Layer Mixer", EditorStyles.boldLabel);
             
             if (currentSound.layers == null) currentSound.layers = new List<SoundParameters>();
             int totalLayers = currentSound.layers.Count;
             string[] layerTabs = new string[1 + totalLayers];
-            layerTabs[0] = "Capa Base";
+            layerTabs[0] = "Base Sound";
             for (int i = 0; i < totalLayers; i++)
             {
-                layerTabs[i + 1] = $"Capa #{i + 1} ({currentSound.layers[i].waveType})";
+                layerTabs[i + 1] = $"Layer #{i + 1} ({currentSound.layers[i].waveType})";
             }
 
             int selectedTab = activeLayerIndex + 1;
-            int newTab = GUILayout.Toolbar(selectedTab, layerTabs, GUILayout.Height(22));
+            int newTab = GUILayout.Toolbar(selectedTab, layerTabs, GUILayout.Height(24));
             activeLayerIndex = newTab - 1;
 
-            GUILayout.Space(5);
+            GUILayout.Space(6);
             GUILayout.BeginHorizontal();
             
-            if (GUILayout.Button("Anadir Capa", GUILayout.Height(22)))
+            if (GUILayout.Button("Add Layer", GUILayout.Height(24)))
             {
-                // Clone base sound parameters to provide a beautiful starting point
                 SoundParameters newLayer = currentSound.baseSound.Clone();
-                newLayer.soundName = $"Capa_{currentSound.layers.Count + 1}";
-                newLayer.delay = 0.15f * (currentSound.layers.Count + 1);
-                newLayer.masterGain = 0.35f; // slightly quieter as a layer
+                newLayer.soundName = $"Layer_{currentSound.layers.Count + 1}";
+                newLayer.delay = 0.0f;
+                newLayer.masterGain = 0.75f;
 
                 currentSound.layers.Add(newLayer);
-                activeLayerIndex = currentSound.layers.Count - 1; // select the newly added layer
+                activeLayerIndex = currentSound.layers.Count - 1;
                 UpdateJsonTextArea();
             }
 
             if (activeLayerIndex >= 0 && currentSound.layers != null && activeLayerIndex < currentSound.layers.Count)
             {
                 GUI.backgroundColor = new Color(0.9f, 0.3f, 0.3f);
-                if (GUILayout.Button("X Eliminar Capa", GUILayout.Height(22)))
+                if (GUILayout.Button("Remove Layer", GUILayout.Height(24), GUILayout.Width(110)))
                 {
                     currentSound.layers.RemoveAt(activeLayerIndex);
-                    activeLayerIndex = activeLayerIndex - 1; // fallback to base or previous layer
+                    activeLayerIndex = activeLayerIndex - 1;
                     UpdateJsonTextArea();
                 }
                 GUI.backgroundColor = Color.white;
@@ -202,28 +201,66 @@ namespace RetroSoundSynthesizer.Editor
 
             GUILayout.EndHorizontal();
 
-            // Layer-specific settings slider (Delay and Layer Master Gain)
+            // Layer-specific settings slider (Delay, Gain, Archetypes and Solo audition)
             if (activeLayerIndex >= 0 && currentSound.layers != null && activeLayerIndex < currentSound.layers.Count)
             {
                 GUILayout.Space(6);
                 var activeLayer = currentSound.layers[activeLayerIndex];
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-                GUILayout.Label($"Ajustes Especificos de Capa #{activeLayerIndex + 1}", EditorStyles.miniBoldLabel);
-                activeLayer.delay = EditorGUILayout.Slider("Retardo (Delay en Seg)", activeLayer.delay, 0f, 4f);
-                activeLayer.masterGain = EditorGUILayout.Slider("Ganancia de Capa", activeLayer.masterGain, 0f, 1f);
+                GUILayout.Label($"Layer #{activeLayerIndex + 1} Settings: {activeLayer.soundName}", EditorStyles.miniBoldLabel);
+                activeLayer.delay = EditorGUILayout.Slider("Delay Offset (Sec)", activeLayer.delay, 0f, 4f);
+                activeLayer.masterGain = EditorGUILayout.Slider("Layer Gain", activeLayer.masterGain, 0f, 1f);
+
+                GUILayout.Space(4);
+                GUILayout.Label("Quick Layer Presets:", EditorStyles.miniLabel);
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("Noise Hit", EditorStyles.miniButton))
+                {
+                    SynthEngine.GenerateLayerPreset(activeLayer, "noise_impact");
+                    UpdateJsonTextArea();
+                    PlayActiveLayerOnly();
+                }
+                if (GUILayout.Button("Sub Bass", EditorStyles.miniButton))
+                {
+                    SynthEngine.GenerateLayerPreset(activeLayer, "sub_bass");
+                    UpdateJsonTextArea();
+                    PlayActiveLayerOnly();
+                }
+                if (GUILayout.Button("Sparkle", EditorStyles.miniButton))
+                {
+                    SynthEngine.GenerateLayerPreset(activeLayer, "sparkle");
+                    UpdateJsonTextArea();
+                    PlayActiveLayerOnly();
+                }
+                if (GUILayout.Button("Echo", EditorStyles.miniButton))
+                {
+                    SynthEngine.GenerateLayerPreset(activeLayer, "retro_echo");
+                    UpdateJsonTextArea();
+                    PlayActiveLayerOnly();
+                }
+                GUILayout.EndHorizontal();
+
+                GUILayout.Space(4);
+                GUI.backgroundColor = new Color(0.3f, 0.7f, 1.0f);
+                if (GUILayout.Button("Preview Layer Only", GUILayout.Height(22)))
+                {
+                    PlayActiveLayerOnly();
+                }
+                GUI.backgroundColor = Color.white;
+
                 EditorGUILayout.EndVertical();
             }
             else
             {
                 GUILayout.Space(4);
-                GUILayout.Label("Editando los parametros de la Capa Base. Se sumara con las capas anadidas.", EditorStyles.miniLabel);
+                GUILayout.Label("Editing Base Sound parameters. Mixed simultaneously with active layers.", EditorStyles.miniLabel);
             }
 
             EditorGUILayout.EndVertical();
             GUILayout.Space(8);
 
             // Tab-Switch control for Synthesis Controls
-            string[] modes = { "Sliders Manuales", "Preset Pad / Mezclador 2D" };
+            string[] modes = { "Manual Sliders", "XY Morph Pad" };
             int newMode = GUILayout.Toolbar(controlMode, modes, GUILayout.Height(30));
             if (newMode != controlMode)
             {
@@ -363,8 +400,8 @@ namespace RetroSoundSynthesizer.Editor
             if (target == null) return;
 
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("2D Bilinear Mixer Pad", EditorStyles.boldLabel);
-            GUILayout.Label("Drag the cyan cursor to smoothly interpolate procedural parameters in real-time.", EditorStyles.miniLabel);
+            GUILayout.Label("XY Morph Pad", EditorStyles.boldLabel);
+            GUILayout.Label("Drag the cursor to smoothly blend between corner retro sound presets.", EditorStyles.miniLabel);
             GUILayout.Space(8);
 
             // Fetch a centered 280x280 Rect
@@ -430,12 +467,12 @@ namespace RetroSoundSynthesizer.Editor
             GUI.color = prevGUIColor;
 
             GUILayout.Space(12);
-            EditorGUILayout.LabelField("Blend Position", $"X: {padCoordinates.x:F3} | Y: {padCoordinates.y:F3}", EditorStyles.miniBoldLabel);
+            EditorGUILayout.LabelField("Morph Position", $"X: {padCoordinates.x:F2} | Y: {padCoordinates.y:F2}", EditorStyles.miniBoldLabel);
             EditorGUILayout.EndVertical();
 
             // Preset fast generation helpers
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("Instant Presets (Seeded)", EditorStyles.boldLabel);
+            GUILayout.Label("Instant Presets", EditorStyles.boldLabel);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Laser")) GenerateFullPreset("laser");
             if (GUILayout.Button("Coin")) GenerateFullPreset("coin");
@@ -446,7 +483,7 @@ namespace RetroSoundSynthesizer.Editor
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Powerup")) GenerateFullPreset("powerup");
             if (GUILayout.Button("Hit")) GenerateFullPreset("hit");
-            if (GUILayout.Button("NES Bass")) GenerateFullPreset("nes_bass");
+            if (GUILayout.Button("Retro Bass")) GenerateFullPreset("nes_bass");
             if (GUILayout.Button("Blaster")) GenerateFullPreset("blaster");
             GUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
@@ -484,24 +521,43 @@ namespace RetroSoundSynthesizer.Editor
         private void DrawRightColumn()
         {
             GUILayout.Space(10);
-            GUILayout.Label("FORMATO Y EXPORTACION", headerStyle);
+            GUILayout.Label("FORMAT AND EXPORT", headerStyle);
 
             SoundParameters target = GetActiveEditingParams();
 
             // Sound Name Field
             EditorGUILayout.BeginVertical(sectionStyle);
-            GUILayout.Label("Sound Name", EditorStyles.boldLabel);
-            currentSound.baseSound.soundName = EditorGUILayout.TextField("", currentSound.baseSound.soundName);
+            if (activeLayerIndex >= 0 && currentSound.layers != null && activeLayerIndex < currentSound.layers.Count)
+            {
+                GUILayout.Label($"Editing: Layer #{activeLayerIndex + 1}", EditorStyles.boldLabel);
+                target.soundName = EditorGUILayout.TextField("Layer Name", target.soundName);
+            }
+            else
+            {
+                GUILayout.Label("Sound Name", EditorStyles.boldLabel);
+                currentSound.baseSound.soundName = EditorGUILayout.TextField("", currentSound.baseSound.soundName);
+            }
             EditorGUILayout.EndVertical();
 
             // Big Preview Play Button
             Color originalColor = GUI.backgroundColor;
             GUI.backgroundColor = new Color(0.2f, 0.8f, 0.4f);
-            if (GUILayout.Button("PLAY PREVIEW", GUILayout.Height(50)))
+            if (GUILayout.Button("PLAY PREVIEW (FULL MIX)", GUILayout.Height(46)))
             {
                 PlayCurrentAudio();
             }
             GUI.backgroundColor = originalColor;
+
+            if (activeLayerIndex >= 0 && currentSound.layers != null && activeLayerIndex < currentSound.layers.Count)
+            {
+                GUILayout.Space(3);
+                GUI.backgroundColor = new Color(0.3f, 0.7f, 1.0f);
+                if (GUILayout.Button($"SOLO: PREVIEW LAYER #{activeLayerIndex + 1}", GUILayout.Height(28)))
+                {
+                    PlayActiveLayerOnly();
+                }
+                GUI.backgroundColor = originalColor;
+            }
 
             GUILayout.Space(5);
 
@@ -730,6 +786,14 @@ namespace RetroSoundSynthesizer.Editor
         {
             AddToAuditionHistory(currentSound);
             float[] buffer = SynthEngine.Synthesize(currentSound);
+            PlayPreview(buffer, currentSound.baseSound.sampleRate);
+        }
+
+        private void PlayActiveLayerOnly()
+        {
+            SoundParameters target = GetActiveEditingParams();
+            if (target == null) return;
+            float[] buffer = SynthEngine.Synthesize(target);
             PlayPreview(buffer, currentSound.baseSound.sampleRate);
         }
 

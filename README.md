@@ -9,7 +9,7 @@ An offline, local, procedural 8/16-bit sound synthesis package for Unity based o
 - Advanced LFO Modulation: Real-time modulation of Pitch, Filter Cutoff, Duty Cycle, or Volume using Sine, Triangle, Square, or Sawtooth LFO waveforms.
 - Multi-Layer Mixing: Sum a base sound and multiple sub-layers with customizable delay offsets and volume levels to create complex retro effects.
 - Audition History: A local session history stack of up to 12 generated sounds, allowing you to instantly compare, restore, and play prior configurations.
-- 2D Bilinear Morph Pad: Drag a cursor between 4 seeded preset corners (Laser, Coin, Explosion, Jump) to dynamically blend and discover new sounds.
+- XY Morph Pad: Drag a cursor between 4 seeded preset corners (Laser, Coin, Explosion, Jump) to dynamically blend and discover new sounds.
 - Wave Exporter: Linear downsampling from 44.1kHz and 8/16-bit PCM wave formatting, saving assets directly into the Unity project directory.
 - Deep JSON Serialization: Fully serializable data model (CompositeSound) allowing simple clipboard copying, loading, and generation via external artificial intelligence tools.
 
@@ -37,7 +37,7 @@ To open the synthesizer editor, go to Tools -> Procedural Audio Synthesizer in t
 
 - Layering Mixer: Manage multiple layers. Use the tabs to select which layer to edit. You can add layers, remove the selected layer, and adjust the delay offset or gain of specific sub-layers.
 - Manual Sliders: Manually adjust individual synthesis parameters (envelope, frequency, LFO, filters, etc.). The sliders automatically adapt to whichever layer is currently selected in the Layering Mixer.
-- 2D Bilinear Mixer Pad: Visually interpolate parameters in real-time by dragging the cyan handle between the four corners representing classic seeded templates.
+- XY Morph Pad: Visually interpolate parameters in real-time by dragging the cyan handle between the four corners representing classic seeded templates.
 
 ### Format and Export (Right Column)
 
